@@ -17,6 +17,21 @@ function showLoginScreen(){
   document.getElementById("app-root").hidden = true;
   document.getElementById("login-screen").hidden = false;
   document.getElementById("login-password").value = "";
+  showLoginForm(); // al volver a la pantalla de acceso (ej. tras salir), siempre arranca en login, no en registro
+}
+function showLoginForm(){
+  document.getElementById("signup-form").hidden = true;
+  document.getElementById("login-form").hidden = false;
+}
+function showSignupForm(){
+  document.getElementById("login-form").hidden = true;
+  document.getElementById("signup-form").hidden = false;
+}
+function showSignupAlert(msg, type){
+  const box = document.getElementById("signup-alert");
+  box.hidden = false;
+  box.className = "alert " + type;
+  box.textContent = (type === "error" ? "⚠️ " : "✅ ") + msg;
 }
 async function enterApp(){
   document.getElementById("login-screen").hidden = true;
@@ -55,6 +70,40 @@ async function handleLogin(e){
 }
 async function handleLogout(){
   await sb.auth.signOut();
+}
+// El registro crea una cuenta de Supabase Auth nueva; el aislamiento de datos por
+// dueño (RLS + user_id) ya está en la base — con solo iniciar sesión, esa persona
+// arranca con su propia agenda vacía (shared.js/cuenta-cobro.js crean su fila de
+// `prestador`/`deducciones` solas la primera vez que las necesitan).
+async function handleSignup(e){
+  e.preventDefault();
+  const email = document.getElementById("signup-email").value.trim();
+  const password = document.getElementById("signup-password").value;
+  const passwordConfirm = document.getElementById("signup-password-confirm").value;
+  if (password !== passwordConfirm){
+    showSignupAlert("Las contraseñas no coinciden.", "error");
+    return;
+  }
+  if (password.length < 6){
+    showSignupAlert("La contraseña debe tener al menos 6 caracteres.", "error");
+    return;
+  }
+  const btn = document.getElementById("btn-signup");
+  btn.disabled = true;
+  const { data, error } = await sb.auth.signUp({ email, password });
+  btn.disabled = false;
+  if (error){
+    showSignupAlert("No se pudo crear la cuenta: " + error.message, "error");
+    return;
+  }
+  if (data.session){
+    // Confirmación de correo desactivada en este proyecto: ya queda con sesión
+    // iniciada — onAuthStateChange se encarga de entrar a la app.
+    return;
+  }
+  // Confirmación de correo activada: todavía no hay sesión hasta que confirme.
+  document.getElementById("signup-form").reset();
+  showSignupAlert("Cuenta creada. Revisa tu correo y confirma tu cuenta para poder iniciar sesión.", "ok");
 }
 
 // ---------- Render: alerta ----------
@@ -984,10 +1033,14 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if (!sb){
     showLoginAlert("No se pudo cargar el sistema de acceso (revisa tu conexión a internet) y vuelve a intentar recargando la página.", "error");
     document.getElementById("btn-login").disabled = true;
+    document.getElementById("btn-signup").disabled = true;
     return;
   }
 
   document.getElementById("login-form").addEventListener("submit", handleLogin);
+  document.getElementById("signup-form").addEventListener("submit", handleSignup);
+  document.getElementById("link-show-signup").addEventListener("click", (e)=>{ e.preventDefault(); showSignupForm(); });
+  document.getElementById("link-show-login").addEventListener("click", (e)=>{ e.preventDefault(); showLoginForm(); });
   document.getElementById("btn-logout").addEventListener("click", handleLogout);
   sb.auth.onAuthStateChange((event, session)=>{
     if (session) enterApp(); else showLoginScreen();

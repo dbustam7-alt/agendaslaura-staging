@@ -14,7 +14,7 @@
   🧪 AMBIENTE DE PRUEBAS — datos de ejemplo, no reales. La app real está en dbustam7-alt.github.io/agendaslaura/
 </div>
 
-<!-- LOGIN -->
+<!-- LOGIN / REGISTRO -->
 <div id="login-screen">
   <form id="login-form" class="login-card">
     <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
@@ -27,7 +27,26 @@
       <input type="password" id="login-password" required autocomplete="current-password">
     </label>
     <button type="submit" id="btn-login" class="btn primary">Entrar</button>
-    <p class="login-note">El acceso es solo para personas autorizadas por el consultorio. Si no tienes cuenta, pídele a quien administra la agenda que te cree una.</p>
+    <p class="login-note">Cada cuenta ve solo su propia información — nadie más ve tus turnos, entidades ni cuentas de cobro.</p>
+    <p class="login-switch">¿No tienes cuenta? <a href="#" id="link-show-signup">Crea una</a></p>
+  </form>
+
+  <form id="signup-form" class="login-card" hidden>
+    <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
+    <p class="subtitle">Crea tu cuenta</p>
+    <div id="signup-alert" class="alert" hidden></div>
+    <label>Correo electrónico
+      <input type="email" id="signup-email" required autocomplete="username">
+    </label>
+    <label>Contraseña
+      <input type="password" id="signup-password" required autocomplete="new-password" minlength="6">
+    </label>
+    <label>Confirmar contraseña
+      <input type="password" id="signup-password-confirm" required autocomplete="new-password" minlength="6">
+    </label>
+    <button type="submit" id="btn-signup" class="btn primary">Crear cuenta</button>
+    <p class="login-note">Empiezas con tu propia agenda vacía: tus propias entidades, turnos y cuentas de cobro, separados de cualquier otra cuenta.</p>
+    <p class="login-switch">¿Ya tienes cuenta? <a href="#" id="link-show-login">Inicia sesión</a></p>
   </form>
 </div>
 

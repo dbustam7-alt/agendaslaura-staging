@@ -36,6 +36,7 @@ header h1{margin:0; font-size:1.5rem;}
 .login-card input{padding:10px 12px;}
 .login-card .btn{width:100%; padding:11px;}
 .login-note{font-size:.74rem; color:var(--muted); text-align:center; margin:4px 0 0; font-weight:400;}
+.login-switch{font-size:.82rem; text-align:center; margin:10px 0 0;}
 main{max-width:1100px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:18px;}
 .card{
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px;
