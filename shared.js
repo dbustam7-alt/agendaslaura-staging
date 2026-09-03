@@ -82,13 +82,20 @@ function deduccionesToRow(d){
     retefuente_pct: d.retefuentePct,
   };
 }
+// `deducciones` (igual que `prestador`) ya no es una fila global fija (id=1): es una
+// fila por usuario, aislada por RLS (user_id = auth.uid()). Si es la primera vez que
+// este usuario entra, todavía no tiene fila propia — se crea aquí mismo con los
+// valores por defecto de la base de datos (que ya coinciden con DEFAULT_DEDUCCIONES).
 async function fetchDeducciones(){
-  const { data, error } = await sb.from("deducciones").select("*").eq("id", 1).single();
+  const { data, error } = await sb.from("deducciones").select("*").maybeSingle();
   if (error){ showAlert("Error cargando deducciones: " + error.message, "error"); return {...DEFAULT_DEDUCCIONES}; }
-  return rowToDeducciones(data);
+  if (data) return rowToDeducciones(data);
+  const { data: created, error: insErr } = await sb.from("deducciones").insert({}).select().single();
+  if (insErr){ showAlert("Error creando tus deducciones iniciales: " + insErr.message, "error"); return {...DEFAULT_DEDUCCIONES}; }
+  return rowToDeducciones(created);
 }
 async function saveDeduccionesDB(){
-  const { error } = await sb.from("deducciones").update(deduccionesToRow(DEDUCCIONES)).eq("id", 1);
+  const { error } = await sb.from("deducciones").update(deduccionesToRow(DEDUCCIONES));
   if (error) throw error;
 }
 

@@ -25,21 +25,29 @@ function rowToPrestador(row){
     siguienteNumero: row.siguiente_numero, certificacionTributaria: row.certificacion_tributaria,
   };
 }
+// `prestador` ya no es una fila global fija (id=1): es una fila por usuario, aislada
+// por RLS (user_id = auth.uid()). Si es la primera vez que este usuario entra,
+// todavía no tiene fila propia — se crea aquí mismo con los valores por defecto de
+// la base de datos (nombre/identificación vacíos, próximo N° = 1, certificación
+// tributaria estándar), listos para que los complete en «Tus datos».
 async function fetchPrestador(){
-  const { data, error } = await sb.from("prestador").select("*").eq("id", 1).single();
+  const { data, error } = await sb.from("prestador").select("*").maybeSingle();
   if (error){ showAlert("Error cargando tus datos: " + error.message, "error"); return null; }
-  return rowToPrestador(data);
+  if (data) return rowToPrestador(data);
+  const { data: created, error: insErr } = await sb.from("prestador").insert({}).select().single();
+  if (insErr){ showAlert("Error creando tus datos iniciales: " + insErr.message, "error"); return null; }
+  return rowToPrestador(created);
 }
 async function savePrestadorDB(p){
   const { error } = await sb.from("prestador").update({
     nombre: p.nombre, identificacion: p.identificacion, direccion: p.direccion, ciudad: p.ciudad, telefono: p.telefono,
     banco: p.banco, tipo_cuenta: p.tipoCuenta, numero_cuenta: p.numeroCuenta,
     siguiente_numero: p.siguienteNumero, certificacion_tributaria: p.certificacionTributaria,
-  }).eq("id", 1);
+  });
   if (error) throw error;
 }
 async function bumpSiguienteNumero(n){
-  const { error } = await sb.from("prestador").update({ siguiente_numero: n }).eq("id", 1);
+  const { error } = await sb.from("prestador").update({ siguiente_numero: n });
   if (error) throw error;
 }
 
