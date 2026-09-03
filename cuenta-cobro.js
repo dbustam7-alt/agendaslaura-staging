@@ -401,9 +401,16 @@ async function handleGenerar(){
 }
 
 // ---------- Historial + estado de pago ----------
-function renderResumenCobro(){
-  const pendiente = CUENTAS.filter(c=>c.estado !== "pagada");
-  const pagado = CUENTAS.filter(c=>c.estado === "pagada");
+// Filtro por rango de fecha de emisión: solo afecta lo que se ve en pantalla
+// (historial y su resumen), nunca las cuentas de cobro en sí ni el cierre anual.
+function cuentasFiltradas(){
+  const desde = document.getElementById("hist-desde").value;
+  const hasta = document.getElementById("hist-hasta").value;
+  return CUENTAS.filter(c => (!desde || c.fechaEmision >= desde) && (!hasta || c.fechaEmision <= hasta));
+}
+function renderResumenCobro(cuentas){
+  const pendiente = cuentas.filter(c=>c.estado !== "pagada");
+  const pagado = cuentas.filter(c=>c.estado === "pagada");
   const sumaPendiente = pendiente.reduce((s,c)=> s + c.total, 0);
   const sumaPagado = pagado.reduce((s,c)=> s + c.total, 0);
   document.getElementById("resumen-cobro").innerHTML = `
@@ -420,20 +427,32 @@ function renderResumenCobro(){
   `;
 }
 function renderHistorial(){
-  renderResumenCobro();
+  const desde = document.getElementById("hist-desde").value;
+  const hasta = document.getElementById("hist-hasta").value;
+  const cuentas = cuentasFiltradas();
+
+  const hint = document.getElementById("hist-filtro-hint");
+  if (desde || hasta){
+    hint.hidden = false;
+    hint.textContent = `Mostrando ${cuentas.length} de ${CUENTAS.length} cuenta(s) de cobro${desde ? " desde " + desde : ""}${hasta ? " hasta " + hasta : ""}.`;
+  } else {
+    hint.hidden = true;
+  }
+
+  renderResumenCobro(cuentas);
   const tbody = document.getElementById("historial-rows");
-  tbody.innerHTML = CUENTAS.map(c=>{
+  tbody.innerHTML = cuentas.map(c=>{
     const nombres = c.entidadIds.map(id => getEntidad(id)).filter(Boolean).map(e=>e.nombre);
     const nombre = nombres.length ? nombres.join(" + ") : (c.adquirenteSnapshot ? c.adquirenteSnapshot.razonSocial : "?");
     const pagada = c.estado === "pagada";
-    const estadoTxt = pagada ? `Pagada${c.fechaPago ? " (" + c.fechaPago + ")" : ""}` : "Pendiente";
     return `<tr>
       <td>${String(c.numero).padStart(3,"0")}</td>
       <td>${c.fechaEmision}</td>
       <td>${esc(nombre)}</td>
       <td>${c.periodoDesde} – ${c.periodoHasta}</td>
       <td>${fmtMoney(c.total)}</td>
-      <td><span class="imp-status ${pagada ? "ok" : "conflict"}">${esc(estadoTxt)}</span></td>
+      <td><span class="imp-status ${pagada ? "ok" : "conflict"}">${pagada ? "Pagada" : "Pendiente"}</span></td>
+      <td>${c.fechaPago || "—"}</td>
       <td style="white-space:nowrap;">
         <button type="button" class="btn secondary btn-sm" data-ver="${c.id}">Ver / Reimprimir</button>
         <button type="button" class="btn secondary btn-sm" data-toggle-estado="${c.id}">${pagada ? "Marcar pendiente" : "Marcar pagada"}</button>
@@ -535,4 +554,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.getElementById("btn-preview").addEventListener("click", handlePreview);
   document.getElementById("btn-generar").addEventListener("click", handleGenerar);
   document.getElementById("btn-print").addEventListener("click", ()=> window.print());
+
+  document.getElementById("hist-desde").addEventListener("change", renderHistorial);
+  document.getElementById("hist-hasta").addEventListener("change", renderHistorial);
+  document.getElementById("btn-hist-limpiar").addEventListener("click", ()=>{
+    document.getElementById("hist-desde").value = "";
+    document.getElementById("hist-hasta").value = "";
+    renderHistorial();
+  });
 });

@@ -161,9 +161,19 @@
   <section class="card no-print">
     <h2>📚 Historial de cuentas de cobro</h2>
     <div id="resumen-cobro" class="resumen-grid" style="margin-bottom:14px;"></div>
+    <div class="cc-grid" style="align-items:flex-end;">
+      <label>Emitidas desde
+        <input type="date" id="hist-desde">
+      </label>
+      <label>Emitidas hasta
+        <input type="date" id="hist-hasta">
+      </label>
+      <button type="button" id="btn-hist-limpiar" class="btn secondary" style="justify-self:start;">Limpiar filtro</button>
+    </div>
+    <p class="hint" id="hist-filtro-hint" hidden></p>
     <div class="table-wrap">
       <table id="tbl-historial">
-        <thead><tr><th>N°</th><th>Fecha emisión</th><th>Entidad</th><th>Periodo</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Fecha emisión</th><th>Entidad</th><th>Periodo</th><th>Total</th><th>Estado</th><th>Fecha pago</th><th></th></tr></thead>
         <tbody id="historial-rows"></tbody>
       </table>
     </div>
