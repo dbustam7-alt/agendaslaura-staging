@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧪 Cuentas de cobro — PRUEBAS</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  /* ---------- layout propio de esta página ---------- */
+  .cc-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px 16px; margin-bottom:12px; }
+  #needs-login{ max-width:480px; margin:80px auto; text-align:center; }
+  .table-num td, .table-num th{ text-align:right; }
+  #historial-rows td:nth-child(3){ max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---------- factura imprimible: mimetiza el formato real de cuenta de cobro ---------- */
+  #invoice{
+    background:#fff; color:#111; padding:28px 32px; border:1px solid var(--line); border-radius:10px;
+    font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:1.45;
+  }
+  .inv-header{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:18px; }
+  .inv-header h1{ margin:0; font-size:1.7rem; letter-spacing:.02em; }
+  .inv-sub{ margin:4px 0 0; font-size:.72rem; color:#555; }
+  .inv-meta{ border-collapse:collapse; min-width:200px; }
+  .inv-meta th, .inv-meta td{ border:1px solid #1e3a5f; padding:5px 10px; text-align:center; font-size:.75rem; }
+  .inv-meta th{ background:#1e3a5f; color:#fff; }
+  .inv-numero{ font-weight:800; font-size:1.1rem; }
+  .inv-parties{ display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:16px; }
+  .inv-parties h3{ font-size:.8rem; border-bottom:2px solid #1e3a5f; padding-bottom:4px; margin:0 0 6px; }
+  .inv-parties p{ margin:2px 0; font-size:.82rem; }
+  .inv-table{ width:100%; border-collapse:collapse; margin-bottom:0; }
+  .inv-table th{ background:#1e3a5f; color:#fff; padding:7px 8px; font-size:.72rem; text-align:left; }
+  .inv-table th:first-child, .inv-table td:first-child{ text-align:center; width:50px; }
+  .inv-table th:last-child, .inv-table td:last-child, .inv-table th:nth-child(3), .inv-table td:nth-child(3){ text-align:right; }
+  .inv-table td{ padding:6px 8px; border-bottom:1px solid #ddd; font-size:.78rem; }
+  .inv-total{ display:flex; justify-content:space-between; align-items:center; background:#eef2f6; padding:10px 12px; font-weight:800; margin-top:0; }
+  .inv-total b{ font-size:1.05rem; }
+  .inv-pago{ margin-top:14px; font-size:.8rem; }
+  .inv-pago h4{ margin:0 0 4px; font-size:.78rem; }
+  .inv-cert{ margin-top:14px; border:1px solid #d9a441; background:#fdf6e8; padding:10px 12px; border-radius:6px; }
+  .inv-cert h4{ margin:0 0 4px; font-size:.75rem; }
+  .inv-cert p{ margin:0; font-size:.74rem; }
+  .inv-legal{ font-size:.68rem; font-style:italic; color:#555; margin-top:10px; }
+  .inv-firma{ margin-top:32px; }
+  .inv-firma-line{ width:260px; border-top:1px solid #111; margin-bottom:4px; }
+  .inv-firma p{ margin:0; font-size:.8rem; }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #invoice, #invoice *{ visibility:visible; }
+    #invoice{ position:absolute; top:0; left:0; width:100%; border:none; border-radius:0; padding:16px 24px; }
+    .no-print{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div style="background:#b91c1c; color:#fff; text-align:center; padding:8px 12px; font-weight:700; font-size:.85rem;" class="no-print">
+  🧪 AMBIENTE DE PRUEBAS — datos de ejemplo, no reales.
+</div>
+
+<div id="needs-login" class="card no-print">
+  <h1>🧾 Cuentas de cobro</h1>
+  <p class="hint">Necesitas iniciar sesión primero en la app principal.</p>
+  <p><a href="index.html" class="btn primary">Ir a Agenda Laura</a></p>
+</div>
+
+<div id="cc-root" hidden>
+
+<header class="no-print">
+  <div class="header-row">
+    <div>
+      <h1>🧾 Cuentas de cobro 🧪 PRUEBAS</h1>
+      <p class="subtitle">Genera y descarga cuentas de cobro a partir de los turnos ya registrados</p>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="btn secondary">← Volver a la agenda</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="alert-box" class="alert no-print" hidden></div>
+
+  <!-- DATOS DEL PRESTADOR -->
+  <section class="card no-print">
+    <h2>👤 Tus datos (prestador del servicio)</h2>
+    <p class="hint">Salen igual en todas las cuentas de cobro que generes. Es información tuya, no de tus clientes.</p>
+    <div class="cc-grid">
+      <label>Nombre completo<input type="text" id="pr-nombre"></label>
+      <label>Identificación (ej. C.C. 1.037.629.531)<input type="text" id="pr-identificacion"></label>
+      <label>Dirección<input type="text" id="pr-direccion"></label>
+      <label>Ciudad<input type="text" id="pr-ciudad"></label>
+      <label>Teléfono<input type="text" id="pr-telefono"></label>
+      <label>Banco<input type="text" id="pr-banco"></label>
+      <label>Tipo de cuenta<input type="text" id="pr-tipo-cuenta" placeholder="Ahorros / Corriente"></label>
+      <label>Número de cuenta<input type="text" id="pr-numero-cuenta"></label>
+      <label>Próximo N° de cuenta de cobro<input type="number" id="pr-siguiente-numero" min="1"></label>
+    </div>
+    <label>Certificación tributaria (Art. 103, 383 y 206 E.T.)
+      <textarea id="pr-certificacion" rows="4" style="width:100%; font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px;"></textarea>
+    </label>
+    <button type="button" id="btn-save-prestador" class="btn primary" style="margin-top:10px;">Guardar mis datos</button>
+  </section>
+
+  <!-- DATOS DE FACTURACIÓN POR ENTIDAD -->
+  <section class="card no-print">
+    <h2>🏢 Datos de facturación por entidad</h2>
+    <p class="hint">Solo para entidades que facturan (por hora / por agenda) — es lo que va en "ADQUIRENTE / COMPRADOR" de la cuenta de cobro.</p>
+    <label>Entidad
+      <select id="fact-entidad-select"></select>
+    </label>
+    <div class="cc-grid">
+      <label>Razón social<input type="text" id="fact-razon-social"></label>
+      <label>NIT<input type="text" id="fact-nit"></label>
+      <label>Dirección<input type="text" id="fact-direccion" placeholder="Por confirmar"></label>
+      <label>Ciudad<input type="text" id="fact-ciudad" placeholder="Por confirmar"></label>
+      <label>Teléfono<input type="text" id="fact-telefono" placeholder="Por confirmar"></label>
+    </div>
+    <button type="button" id="btn-save-facturacion" class="btn primary">Guardar datos de facturación</button>
+  </section>
+
+  <!-- GENERAR CUENTA DE COBRO -->
+  <section class="card no-print">
+    <h2>➕ Generar cuenta de cobro</h2>
+    <div class="cc-grid">
+      <label>Entidad
+        <select id="gen-entidad"></select>
+      </label>
+      <label>Desde
+        <input type="date" id="gen-desde">
+      </label>
+      <label>Hasta
+        <input type="date" id="gen-hasta">
+      </label>
+    </div>
+    <button type="button" id="btn-preview" class="btn secondary">Vista previa</button>
+
+    <div id="preview-wrap" hidden style="margin-top:14px;">
+      <div class="table-wrap">
+        <table class="tbl-import table-num" id="preview-table"></table>
+      </div>
+      <button type="button" id="btn-generar" class="btn primary" style="margin-top:10px;" disabled>Generar cuenta de cobro</button>
+    </div>
+  </section>
+
+  <!-- FACTURA GENERADA -->
+  <section class="card" id="invoice-wrap" hidden>
+    <div class="card-header no-print">
+      <h2>📄 Cuenta de cobro generada</h2>
+      <button type="button" id="btn-print" class="btn primary">🖨️ Imprimir / Guardar como PDF</button>
+    </div>
+    <div id="invoice"></div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="card no-print">
+    <h2>📚 Historial de cuentas de cobro</h2>
+    <div class="table-wrap">
+      <table id="tbl-historial">
+        <thead><tr><th>N°</th><th>Fecha emisión</th><th>Entidad</th><th>Periodo</th><th>Total</th><th></th></tr></thead>
+        <tbody id="historial-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="cuenta-cobro.js"></script>
+</body>
+</html>
