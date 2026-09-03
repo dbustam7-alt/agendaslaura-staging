@@ -319,6 +319,7 @@ function renderCierre(anio){
         <td>${fmtMoney(c.total)}</td>
         <td>${fmtMoney(c.neto)}</td>
         <td><span class="imp-status ${pagada ? "ok" : "conflict"}">${pagada ? "Pagada" : "Pendiente"}</span></td>
+        <td>${c.fechaPago || "—"}</td>
       </tr>`;
     }).join("");
     detalleWrap.hidden = false;
