@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧪 Cierre anual — PRUEBAS</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div style="background:#b91c1c; color:#fff; text-align:center; padding:8px 12px; font-weight:700; font-size:.85rem;" class="no-print">
+  🧪 AMBIENTE DE PRUEBAS — datos de ejemplo, no reales.
+</div>
+
+<div id="needs-login" class="card">
+  <h1>📊 Cierre anual</h1>
+  <p class="hint">Necesitas iniciar sesión primero en la app principal.</p>
+  <p><a href="index.html" class="btn primary">Ir a Agenda Laura</a></p>
+</div>
+
+<div id="ca-root" hidden>
+
+<header>
+  <div class="header-row">
+    <div>
+      <h1>📊 Cierre anual 🧪 PRUEBAS</h1>
+      <p class="subtitle">Total facturado, deducciones y neto del año — para la declaración de renta</p>
+    </div>
+    <div class="header-actions">
+      <a href="cuenta-cobro.html" class="btn secondary">🧾 Cuentas de cobro</a>
+      <a href="index.html" class="btn secondary">← Volver a la agenda</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="alert-box" class="alert" hidden></div>
+
+  <section class="card">
+    <h2>Selecciona el año</h2>
+    <p class="hint">Se calcula sobre las cuentas de cobro ya generadas (fecha de emisión), no sobre los turnos agendados — es lo que realmente se facturó y quedó documentado.</p>
+    <div class="cc-grid" style="display:flex; align-items:flex-end; gap:12px;">
+      <label>Año
+        <input type="number" id="ca-anio" step="1" style="width:120px;">
+      </label>
+      <button type="button" id="btn-calcular" class="btn primary">Calcular cierre</button>
+    </div>
+  </section>
+
+  <section class="card" id="ca-results" hidden>
+    <h2 id="ca-titulo"></h2>
+    <div class="resumen-grid" id="ca-resumen"></div>
+  </section>
+
+  <section class="card" id="ca-entidades-wrap" hidden>
+    <h2>Facturado por entidad</h2>
+    <div class="table-wrap">
+      <table class="table-num" id="tbl-ca-entidades">
+        <thead><tr><th style="text-align:left;">Entidad</th><th>Bruto</th><th>% del total</th></tr></thead>
+        <tbody id="ca-entidades-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="ca-detalle-wrap" hidden>
+    <h2>Cuentas de cobro del año (detalle)</h2>
+    <div class="table-wrap">
+      <table id="tbl-ca-detalle">
+        <thead><tr><th>N°</th><th>Fecha</th><th>Entidad</th><th>Bruto</th><th>Neto</th><th>Estado</th></tr></thead>
+        <tbody id="ca-detalle-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="cierre-anual.js"></script>
+</body>
+</html>

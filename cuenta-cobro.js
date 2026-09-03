@@ -65,29 +65,10 @@ async function upsertFacturacionDB(entidadId, data){
   }
 }
 
-// ---------- Cuentas de cobro: persistencia (historial, snapshot inmutable) ----------
-function rowToCuenta(row){
-  const entidadIds = (row.entidad_ids && row.entidad_ids.length) ? row.entidad_ids : (row.entidad_id ? [row.entidad_id] : []);
-  return {
-    id: row.id, numero: row.numero, entidadIds,
-    fechaEmision: row.fecha_emision, periodoDesde: row.periodo_desde, periodoHasta: row.periodo_hasta,
-    prestadorSnapshot: row.prestador_snapshot, adquirenteSnapshot: row.adquirente_snapshot,
-    lineas: row.lineas, total: Number(row.total), certificacionSnapshot: row.certificacion_snapshot,
-  };
-}
-async function fetchCuentasCobro(){
-  const { data, error } = await sb.from("cuentas_cobro").select("*").order("numero", { ascending:false });
-  if (error){ showAlert("Error cargando el historial: " + error.message, "error"); return []; }
-  return data.map(rowToCuenta);
-}
-async function insertCuentaCobroDB(row){
-  const { error } = await sb.from("cuentas_cobro").insert(row);
-  if (error) throw error;
-}
-async function deleteCuentaCobroDB(id){
-  const { error } = await sb.from("cuentas_cobro").delete().eq("id", id);
-  if (error) throw error;
-}
+// (La persistencia de `cuentas_cobro` — rowToCuenta/fetchCuentasCobro/insertCuentaCobroDB/
+// deleteCuentaCobroDB/updateEstadoCuentaDB — vive en shared.js: la usa esta página y
+// también cierre-anual.js.)
+
 // El próximo número siempre es (el más alto que quede) + 1 — así borrar una de prueba
 // libera su número para la próxima vez, sin arriesgar que dos cuentas de cobro
 // terminen compartiendo el mismo número.
@@ -137,12 +118,14 @@ function buildLineasPorHora(turnos, etiqueta){
     else if (calc.nocMin > 0 && calc.ordMin > 0) tipoTexto = "mixto";
     let concepto = `Turno ${tipoTexto} - ${fechaTexto} (${t.inicio} - ${t.fin})${t.sede ? " - " + t.sede : ""}`;
     if (etiqueta) concepto += ` — ${etiqueta}`;
-    return { cantidad: horas, cantidadTexto: fmtHours(horas), concepto, valorUnit, total: calc.subtotal, fecha: t.fecha };
+    return { cantidad: horas, cantidadTexto: fmtHours(horas), concepto, valorUnit, total: calc.subtotal, fecha: t.fecha, entidadId: t.entidadId, entidadNombre: etiqueta || getEntidad(t.entidadId)?.nombre };
   });
 }
 function buildLineasPorAgenda(turnos, etiqueta){
   const porRemitente = {};
+  let entidadId = null;
   for (const t of turnos){
+    entidadId = t.entidadId;
     const calc = calcularTurno(t);
     for (const d of (calc.detalleLista || [])){
       const cur = porRemitente[d.nombre] || { cantidad:0, total:0, tarifa:d.tarifa };
@@ -150,10 +133,11 @@ function buildLineasPorAgenda(turnos, etiqueta){
       porRemitente[d.nombre] = cur;
     }
   }
+  const entidadNombre = etiqueta || (entidadId ? getEntidad(entidadId)?.nombre : null);
   return Object.entries(porRemitente).map(([nombre, v])=>({
     cantidad: v.cantidad, cantidadTexto: String(v.cantidad),
     concepto: `Consulta ${nombre}${etiqueta ? " — " + etiqueta : ""}`,
-    valorUnit: v.tarifa, total: v.total, fecha: null,
+    valorUnit: v.tarifa, total: v.total, fecha: null, entidadId, entidadNombre,
   }));
 }
 
@@ -383,6 +367,9 @@ async function handleGenerar(){
     const numero = PRESTADOR.siguienteNumero;
     const fechaEmision = new Date().toISOString().slice(0,10);
     const entidadIds = entidades.map(e=>e.id);
+    // Las deducciones y el neto quedan congelados con los % vigentes HOY — así el
+    // cierre anual nunca se distorsiona si más adelante cambian esos porcentajes.
+    const ded = calcDeducciones(previewLineas.total);
 
     await insertCuentaCobroDB({
       numero,
@@ -396,6 +383,8 @@ async function handleGenerar(){
       lineas: previewLineas.lineas,
       total: previewLineas.total,
       certificacion_snapshot: PRESTADOR.certificacionTributaria,
+      deducciones_snapshot: { segSocial: ded.segSocial, vacaciones: ded.vacaciones, cesantias: ded.cesantias, retefuente: ded.retefuente, total: ded.total },
+      neto: ded.neto,
     });
     await bumpSiguienteNumero(numero + 1);
     PRESTADOR.siguienteNumero = numero + 1;
@@ -411,20 +400,43 @@ async function handleGenerar(){
   }
 }
 
-// ---------- Historial ----------
+// ---------- Historial + estado de pago ----------
+function renderResumenCobro(){
+  const pendiente = CUENTAS.filter(c=>c.estado !== "pagada");
+  const pagado = CUENTAS.filter(c=>c.estado === "pagada");
+  const sumaPendiente = pendiente.reduce((s,c)=> s + c.total, 0);
+  const sumaPagado = pagado.reduce((s,c)=> s + c.total, 0);
+  document.getElementById("resumen-cobro").innerHTML = `
+    <div class="resumen-item">
+      <h3>⏳ Pendiente por cobrar</h3>
+      <div class="row"><span>${pendiente.length} cuenta(s) de cobro</span></div>
+      <div class="total">${fmtMoney(sumaPendiente)}</div>
+    </div>
+    <div class="resumen-item">
+      <h3>✅ Cobrado</h3>
+      <div class="row"><span>${pagado.length} cuenta(s) de cobro</span></div>
+      <div class="total">${fmtMoney(sumaPagado)}</div>
+    </div>
+  `;
+}
 function renderHistorial(){
+  renderResumenCobro();
   const tbody = document.getElementById("historial-rows");
   tbody.innerHTML = CUENTAS.map(c=>{
     const nombres = c.entidadIds.map(id => getEntidad(id)).filter(Boolean).map(e=>e.nombre);
     const nombre = nombres.length ? nombres.join(" + ") : (c.adquirenteSnapshot ? c.adquirenteSnapshot.razonSocial : "?");
+    const pagada = c.estado === "pagada";
+    const estadoTxt = pagada ? `Pagada${c.fechaPago ? " (" + c.fechaPago + ")" : ""}` : "Pendiente";
     return `<tr>
       <td>${String(c.numero).padStart(3,"0")}</td>
       <td>${c.fechaEmision}</td>
       <td>${esc(nombre)}</td>
       <td>${c.periodoDesde} – ${c.periodoHasta}</td>
       <td>${fmtMoney(c.total)}</td>
+      <td><span class="imp-status ${pagada ? "ok" : "conflict"}">${esc(estadoTxt)}</span></td>
       <td style="white-space:nowrap;">
         <button type="button" class="btn secondary btn-sm" data-ver="${c.id}">Ver / Reimprimir</button>
+        <button type="button" class="btn secondary btn-sm" data-toggle-estado="${c.id}">${pagada ? "Marcar pendiente" : "Marcar pagada"}</button>
         <button type="button" class="btn danger-link" data-del="${c.id}">Eliminar</button>
       </td>
     </tr>`;
@@ -441,9 +453,30 @@ function renderHistorial(){
       document.getElementById("invoice-wrap").scrollIntoView({behavior:"smooth", block:"start"});
     });
   });
+  tbody.querySelectorAll("[data-toggle-estado]").forEach(btn=>{
+    btn.addEventListener("click", ()=> handleToggleEstado(btn.dataset.toggleEstado));
+  });
   tbody.querySelectorAll("[data-del]").forEach(btn=>{
     btn.addEventListener("click", ()=> handleDeleteCuenta(btn.dataset.del));
   });
+}
+async function handleToggleEstado(id){
+  const c = CUENTAS.find(x=>x.id === id);
+  if (!c) return;
+  try{
+    if (c.estado === "pagada"){
+      await updateEstadoCuentaDB(id, "pendiente", null);
+    } else {
+      const hoy = new Date().toISOString().slice(0,10);
+      const fecha = prompt(`Fecha de pago de la cuenta de cobro N° ${String(c.numero).padStart(3,"0")}:`, hoy);
+      if (fecha === null) return; // canceló
+      await updateEstadoCuentaDB(id, "pagada", fecha || hoy);
+    }
+    CUENTAS = await fetchCuentasCobro();
+    renderHistorial();
+  }catch(e){
+    showAlert("Error actualizando el estado de pago: " + e.message, "error");
+  }
 }
 async function handleDeleteCuenta(id){
   const c = CUENTAS.find(x=>x.id === id);

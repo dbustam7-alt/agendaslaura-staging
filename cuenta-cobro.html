@@ -77,6 +77,7 @@
       <p class="subtitle">Genera y descarga cuentas de cobro a partir de los turnos ya registrados</p>
     </div>
     <div class="header-actions">
+      <a href="cierre-anual.html" class="btn secondary">📊 Cierre anual</a>
       <a href="index.html" class="btn secondary">← Volver a la agenda</a>
     </div>
   </div>
@@ -159,9 +160,10 @@
   <!-- HISTORIAL -->
   <section class="card no-print">
     <h2>📚 Historial de cuentas de cobro</h2>
+    <div id="resumen-cobro" class="resumen-grid" style="margin-bottom:14px;"></div>
     <div class="table-wrap">
       <table id="tbl-historial">
-        <thead><tr><th>N°</th><th>Fecha emisión</th><th>Entidad</th><th>Periodo</th><th>Total</th><th></th></tr></thead>
+        <thead><tr><th>N°</th><th>Fecha emisión</th><th>Entidad</th><th>Periodo</th><th>Total</th><th>Estado</th><th></th></tr></thead>
         <tbody id="historial-rows"></tbody>
       </table>
     </div>

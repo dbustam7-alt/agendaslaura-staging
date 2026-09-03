@@ -92,6 +92,38 @@ async function saveDeduccionesDB(){
   if (error) throw error;
 }
 
+// ---------- Cuentas de cobro: persistencia (historial, snapshot inmutable) ----------
+// Usado por cuenta-cobro.js (generar/editar) y cierre-anual.js (solo lectura).
+function rowToCuenta(row){
+  const entidadIds = (row.entidad_ids && row.entidad_ids.length) ? row.entidad_ids : (row.entidad_id ? [row.entidad_id] : []);
+  return {
+    id: row.id, numero: row.numero, entidadIds,
+    fechaEmision: row.fecha_emision, periodoDesde: row.periodo_desde, periodoHasta: row.periodo_hasta,
+    prestadorSnapshot: row.prestador_snapshot, adquirenteSnapshot: row.adquirente_snapshot,
+    lineas: row.lineas, total: Number(row.total), certificacionSnapshot: row.certificacion_snapshot,
+    estado: row.estado || "pendiente", fechaPago: row.fecha_pago || null,
+    deduccionesSnapshot: row.deducciones_snapshot || null,
+    neto: row.neto != null ? Number(row.neto) : Number(row.total),
+  };
+}
+async function fetchCuentasCobro(){
+  const { data, error } = await sb.from("cuentas_cobro").select("*").order("numero", { ascending:false });
+  if (error){ showAlert("Error cargando el historial: " + error.message, "error"); return []; }
+  return data.map(rowToCuenta);
+}
+async function insertCuentaCobroDB(row){
+  const { error } = await sb.from("cuentas_cobro").insert(row);
+  if (error) throw error;
+}
+async function deleteCuentaCobroDB(id){
+  const { error } = await sb.from("cuentas_cobro").delete().eq("id", id);
+  if (error) throw error;
+}
+async function updateEstadoCuentaDB(id, estado, fechaPago){
+  const { error } = await sb.from("cuentas_cobro").update({ estado, fecha_pago: fechaPago }).eq("id", id);
+  if (error) throw error;
+}
+
 // ---------- Entidades ----------
 function rowToEntidad(row){
   return { id: row.id, nombre: row.nombre, tipo: row.tipo, color: row.color, config: row.config || {}, orden: row.orden, activo: row.activo };
