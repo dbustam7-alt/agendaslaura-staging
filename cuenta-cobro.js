@@ -84,6 +84,33 @@ async function insertCuentaCobroDB(row){
   const { error } = await sb.from("cuentas_cobro").insert(row);
   if (error) throw error;
 }
+async function deleteCuentaCobroDB(id){
+  const { error } = await sb.from("cuentas_cobro").delete().eq("id", id);
+  if (error) throw error;
+}
+// El próximo número siempre es (el más alto que quede) + 1 — así borrar una de prueba
+// libera su número para la próxima vez, sin arriesgar que dos cuentas de cobro
+// terminen compartiendo el mismo número.
+async function recomputeSiguienteNumero(){
+  const maxNumero = CUENTAS.reduce((m,c)=> Math.max(m, c.numero), 0);
+  const correcto = maxNumero + 1;
+  if (PRESTADOR.siguienteNumero !== correcto){
+    PRESTADOR.siguienteNumero = correcto;
+    document.getElementById("pr-siguiente-numero").value = correcto;
+    await bumpSiguienteNumero(correcto);
+  }
+}
+// Chequeo de seguridad al cargar (no al borrar): si el número guardado ya se quedó
+// corto frente a lo que hay (nunca debería pasar, pero por si acaso) lo sube para
+// no arriesgar un choque de números — nunca lo baja solo por cargar la página.
+async function ensureSiguienteNumeroSeguro(){
+  const maxNumero = CUENTAS.reduce((m,c)=> Math.max(m, c.numero), 0);
+  if (PRESTADOR.siguienteNumero <= maxNumero){
+    PRESTADOR.siguienteNumero = maxNumero + 1;
+    document.getElementById("pr-siguiente-numero").value = PRESTADOR.siguienteNumero;
+    await bumpSiguienteNumero(PRESTADOR.siguienteNumero);
+  }
+}
 
 // ---------- Entidades facturables (solo por_hora / por_agenda: las únicas que emiten cuenta de cobro) ----------
 function entidadesFacturables(){
@@ -396,7 +423,10 @@ function renderHistorial(){
       <td>${esc(nombre)}</td>
       <td>${c.periodoDesde} – ${c.periodoHasta}</td>
       <td>${fmtMoney(c.total)}</td>
-      <td><button type="button" class="btn secondary btn-sm" data-ver="${c.id}">Ver / Reimprimir</button></td>
+      <td style="white-space:nowrap;">
+        <button type="button" class="btn secondary btn-sm" data-ver="${c.id}">Ver / Reimprimir</button>
+        <button type="button" class="btn danger-link" data-del="${c.id}">Eliminar</button>
+      </td>
     </tr>`;
   }).join("");
   tbody.querySelectorAll("[data-ver]").forEach(btn=>{
@@ -411,6 +441,23 @@ function renderHistorial(){
       document.getElementById("invoice-wrap").scrollIntoView({behavior:"smooth", block:"start"});
     });
   });
+  tbody.querySelectorAll("[data-del]").forEach(btn=>{
+    btn.addEventListener("click", ()=> handleDeleteCuenta(btn.dataset.del));
+  });
+}
+async function handleDeleteCuenta(id){
+  const c = CUENTAS.find(x=>x.id === id);
+  if (!c) return;
+  if (!confirm(`¿Eliminar definitivamente la cuenta de cobro N° ${String(c.numero).padStart(3,"0")}?\n\nEsto no se puede deshacer. El próximo número se ajusta solo para no dejar huecos raros.`)) return;
+  try{
+    await deleteCuentaCobroDB(id);
+    CUENTAS = await fetchCuentasCobro();
+    await recomputeSiguienteNumero();
+    renderHistorial();
+    showAlert(`Cuenta de cobro N° ${String(c.numero).padStart(3,"0")} eliminada. Próximo número: ${String(PRESTADOR.siguienteNumero).padStart(3,"0")}.`, "ok");
+  }catch(e){
+    showAlert("Error eliminando la cuenta de cobro: " + e.message, "error");
+  }
 }
 
 // ---------- Init ----------
@@ -430,6 +477,7 @@ async function enterPage(){
   CUENTAS = await fetchCuentasCobro();
 
   loadPrestadorIntoForm();
+  await ensureSiguienteNumeroSeguro();
   renderFacturacionEntidadSelector();
   renderGenEntidadOptions();
   renderHistorial();
