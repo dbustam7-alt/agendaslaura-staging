@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧪 Agenda Laura — PRUEBAS</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div style="background:#b91c1c; color:#fff; text-align:center; padding:8px 12px; font-weight:700; font-size:.85rem;">
+  🧪 AMBIENTE DE PRUEBAS — datos de ejemplo, no reales. La app real está en dbustam7-alt.github.io/agendaslaura/
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <form id="login-form" class="login-card">
+    <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
+    <p class="subtitle">Inicia sesión para ver y registrar turnos</p>
+    <div id="login-alert" class="alert" hidden></div>
+    <label>Correo electrónico
+      <input type="email" id="login-email" required autocomplete="username">
+    </label>
+    <label>Contraseña
+      <input type="password" id="login-password" required autocomplete="current-password">
+    </label>
+    <button type="submit" id="btn-login" class="btn primary">Entrar</button>
+    <p class="login-note">El acceso es solo para personas autorizadas por el consultorio. Si no tienes cuenta, pídele a quien administra la agenda que te cree una.</p>
+  </form>
+</div>
+
+<div id="app-root" hidden>
+
+<header>
+  <div class="header-row">
+    <div>
+      <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
+      <p class="subtitle">Asistente Clínico Operativo y Financiero</p>
+    </div>
+    <div class="header-actions">
+      <span id="user-email-label" class="user-email"></span>
+      <button id="btn-open-settings" class="btn secondary">⚙️ Entidades y tarifas</button>
+      <button id="btn-logout" class="btn secondary">Cerrar sesión</button>
+    </div>
+  </div>
+</header>
+
+<dialog id="dlg-settings" class="app-dialog dialog-wide">
+  <div class="dlg-header">
+    <h2>Entidades y tarifas</h2>
+    <button id="btn-close-settings" class="dlg-close" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dlg-body">
+
+    <div class="dlg-section">
+      <h3>Entidades</h3>
+      <p class="hint">Cada entidad define cómo se valida y se factura: <strong>por franja horaria</strong> (bloque semanal fijo, sin facturación — ej. cumplimiento de contrato), <strong>por hora</strong> (tarifa ordinaria vs. nocturna/fin de semana) o <strong>por agenda</strong> (se factura por remitente/paciente — ver «Remitentes por agenda» abajo). El tipo no se puede cambiar una vez creada.</p>
+      <div class="table-wrap">
+        <table id="tbl-entidades">
+          <thead>
+            <tr><th>Nombre</th><th>Tipo</th><th>Configuración</th><th>Color</th><th>Activa</th><th></th></tr>
+          </thead>
+          <tbody id="entidades-rows"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button type="button" id="btn-add-entidad" class="btn secondary">+ Agregar entidad</button>
+        <button type="button" id="btn-save-entidades" class="btn primary">Guardar entidades</button>
+      </div>
+    </div>
+
+    <div class="dlg-section">
+      <h3>Remitentes por agenda</h3>
+      <p class="hint">Solo para entidades «Por agenda»: cada remitente (EPS, aseguradora, medicina prepagada, Particular, Póliza...) tiene su propia tarifa por paciente/visita.</p>
+      <label>Entidad
+        <select id="rem-entidad-select"></select>
+      </label>
+      <div class="table-wrap">
+        <table id="tbl-remitentes">
+          <thead><tr><th>Remitente</th><th>Tarifa ($/paciente)</th></tr></thead>
+          <tbody id="remitentes-rows"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button type="button" id="btn-add-remitente" class="btn secondary">+ Agregar remitente</button>
+        <button type="button" id="btn-save-remitentes" class="btn primary">Guardar remitentes</button>
+      </div>
+    </div>
+
+    <div class="dlg-section">
+      <h3>Deducciones <span class="hint" style="font-weight:400;">(trabajador independiente)</span></h3>
+      <p class="hint">Se descuentan como % del valor <strong>bruto</strong> facturado de cada turno "por hora" o "por agenda" (una entidad "por franja horaria" no genera facturación, así que no aplica). Estos valores son un punto de partida — ajústalos según tu régimen y confírmalos con tu contador.</p>
+      <div class="grid">
+        <label>Base seguridad social
+          <input type="number" id="ded-seg-base" value="40" step="0.1" min="0" max="100">
+        </label>
+        <label>Tasa seg. social sobre esa base (salud+pensión)
+          <input type="number" id="ded-seg-tasa" value="28.5" step="0.1" min="0" max="100">
+        </label>
+        <label>Vacaciones (% del bruto)
+          <input type="number" id="ded-vacaciones" value="4.17" step="0.01" min="0" max="100">
+        </label>
+        <label>Cesantías (% del bruto)
+          <input type="number" id="ded-cesantias" value="8.33" step="0.01" min="0" max="100">
+        </label>
+        <label>Retefuente (% del bruto)
+          <input type="number" id="ded-retefuente" value="11" step="0.1" min="0" max="100">
+        </label>
+      </div>
+      <button type="button" id="btn-save-deducciones" class="btn primary">Guardar deducciones</button>
+    </div>
+
+  </div>
+</dialog>
+
+<dialog id="dlg-import" class="app-dialog dialog-wide">
+  <div class="dlg-header">
+    <h2>Importar turnos masivo</h2>
+    <button id="btn-close-import" class="dlg-close" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dlg-body">
+
+    <div class="dlg-section">
+      <div class="grid">
+        <label>Entidad de los turnos a importar
+          <select id="imp-entidad"></select>
+        </label>
+        <label>O sube un archivo (.csv / .xlsx)
+          <input type="file" id="imp-file" accept=".csv,.xlsx,.xls">
+        </label>
+      </div>
+      <p class="hint" id="imp-format-hint" style="margin:0 0 8px;"></p>
+      <button type="button" id="btn-imp-template" class="btn secondary" style="margin-bottom:12px;">⬇ Descargar plantilla CSV</button>
+      <textarea id="imp-textarea" class="imp-textarea" rows="6" spellcheck="false"></textarea>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button type="button" id="btn-imp-preview" class="btn secondary">Vista previa</button>
+        <button type="button" id="btn-imp-confirm" class="btn primary" disabled>Confirmar importación</button>
+      </div>
+    </div>
+
+    <div class="dlg-section" id="imp-preview-wrap" hidden>
+      <h3>Resultado de la validación</h3>
+      <div class="table-wrap">
+        <table class="tbl-import" id="imp-preview-table"></table>
+      </div>
+    </div>
+
+  </div>
+</dialog>
+
+<main>
+
+  <!-- ALERTAS -->
+  <div id="alert-box" class="alert" hidden></div>
+
+  <!-- NUEVO TURNO -->
+  <section class="card">
+    <div class="card-header">
+      <h2>➕ Registrar turno</h2>
+      <button type="button" id="btn-open-import" class="btn secondary">📥 Importar masivo</button>
+    </div>
+    <div class="grid">
+      <label>Entidad
+        <select id="f-entidad"></select>
+      </label>
+      <label>Fecha
+        <input type="date" id="f-fecha">
+      </label>
+      <label>Hora inicio
+        <input type="time" id="f-inicio">
+      </label>
+      <label>Hora fin
+        <input type="time" id="f-fin">
+      </label>
+      <label id="f-sede-wrap">Sede (opcional)
+        <input type="text" id="f-sede" placeholder="Ej. La 80, Sur...">
+      </label>
+    </div>
+
+    <div id="agenda-fields" hidden>
+      <label class="eps-label">Pacientes/visitas por remitente</label>
+      <div id="f-agenda-rows"></div>
+      <button type="button" id="btn-agenda-add" class="btn secondary btn-sm">+ Agregar remitente</button>
+    </div>
+
+    <button id="btn-add-turno" class="btn primary">Registrar turno</button>
+    <button type="button" id="btn-cancel-edit" class="btn secondary" hidden>Cancelar edición</button>
+  </section>
+
+  <!-- CALENDARIO MENSUAL -->
+  <section class="card">
+    <div class="card-header">
+      <h2>🗓️ Calendario mensual</h2>
+      <div class="cal-nav">
+        <button type="button" id="cal-prev" class="btn secondary" aria-label="Mes anterior">‹</button>
+        <span id="cal-label" class="cal-label"></span>
+        <button type="button" id="cal-next" class="btn secondary" aria-label="Mes siguiente">›</button>
+        <button type="button" id="cal-today" class="btn secondary">Hoy</button>
+      </div>
+    </div>
+    <p class="hint">La franja de color arriba marca los días con un bloqueo fijo. Clic en un turno para eliminarlo.</p>
+    <div class="cal-scroll">
+      <div class="cal-weekdays">
+        <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+  </section>
+
+  <!-- AGENDA CONSOLIDADA -->
+  <section class="card">
+    <div class="card-header">
+      <h2>📅 Agenda consolidada</h2>
+      <label class="inline">Mes
+        <input type="month" id="filter-month">
+      </label>
+    </div>
+    <div class="table-wrap">
+      <table id="tbl-agenda">
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Día</th><th>Entidad</th><th>Inicio</th><th>Fin</th>
+            <th>Horas</th><th>Detalle</th><th>Subtotal</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RESUMEN FINANCIERO -->
+  <section class="card">
+    <h2>💰 Resumen financiero</h2>
+    <div id="resumen-financiero" class="resumen-grid"></div>
+  </section>
+
+  <!-- CIERRE DE MES -->
+  <section class="card">
+    <div class="card-header">
+      <h2>📤 Cierre de mes</h2>
+      <div>
+        <button id="btn-export-csv" class="btn secondary">Descargar CSV</button>
+        <button id="btn-export-xlsx" class="btn primary">Descargar Excel (.xlsx)</button>
+      </div>
+    </div>
+    <p class="hint">CSV y Excel incluyen, del mes filtrado en la agenda: Fecha, Entidad, Sede, Inicio, Fin, Horas, Detalle, Bruto, Seguridad social, Vacaciones, Cesantías, Retefuente y Neto (según las deducciones configuradas en «Entidades y tarifas»).</p>
+  </section>
+
+</main>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

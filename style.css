@@ -1,0 +1,209 @@
+:root{
+  --bg:#f5f7fa; --card:#ffffff; --ink:#1d2430; --muted:#6b7688;
+  --line:#e3e7ee; --primary:#2563eb; --primary-ink:#ffffff;
+  --danger:#dc2626; --danger-bg:#fee2e2; --danger-line:#fca5a5;
+  --ok:#16a34a; --ok-bg:#dcfce7;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+body{
+  margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.4;
+}
+header{
+  padding:20px 24px; background:linear-gradient(135deg,#1e3a8a,#2563eb); color:#fff;
+}
+.header-row{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+header h1{margin:0; font-size:1.5rem;}
+.subtitle{margin:4px 0 0; opacity:.85; font-size:.9rem;}
+.header-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.header-row .btn.secondary{background:rgba(255,255,255,.15); color:#fff;}
+.header-row .btn.secondary:hover{background:rgba(255,255,255,.25);}
+.user-email{font-size:.8rem; opacity:.85;}
+
+/* ---------- login ---------- */
+#login-screen{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#1e3a8a,#2563eb); padding:20px;
+}
+.login-card{
+  background:var(--card); border-radius:14px; padding:32px 28px; width:min(380px,100%);
+  box-shadow:0 20px 50px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:14px;
+}
+.login-card h1{margin:0; font-size:1.4rem; text-align:center;}
+.login-card .subtitle{color:var(--muted); opacity:1; text-align:center; margin:0 0 6px;}
+.login-card label{font-size:.82rem;}
+.login-card input{padding:10px 12px;}
+.login-card .btn{width:100%; padding:11px;}
+.login-note{font-size:.74rem; color:var(--muted); text-align:center; margin:4px 0 0; font-weight:400;}
+main{max-width:1100px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:18px;}
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+.card h2{margin:0 0 14px; font-size:1.05rem;}
+.card-header{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+.card-header h2{margin:0;}
+.grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px 16px; margin-bottom:12px;
+}
+label{display:flex; flex-direction:column; font-size:.8rem; color:var(--muted); gap:4px; font-weight:600;}
+label.inline{flex-direction:row; align-items:center; gap:8px;}
+input,select{
+  font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink);
+}
+input:focus,select:focus{outline:2px solid var(--primary); outline-offset:1px;}
+.btn{
+  border:none; padding:9px 16px; border-radius:8px; font-weight:600; cursor:pointer; font-size:.85rem;
+}
+.btn.primary{background:var(--primary); color:var(--primary-ink);}
+.btn.primary:hover{background:#1d4ed8;}
+.btn.secondary{background:#eef1f6; color:var(--ink);}
+.btn.secondary:hover{background:#e2e6ee;}
+.btn.danger-link{background:transparent; color:var(--danger); padding:4px 8px; font-size:.8rem;}
+
+.alert{
+  padding:12px 16px; border-radius:10px; font-size:.88rem; font-weight:600;
+}
+.alert.error{background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-line);}
+.alert.ok{background:var(--ok-bg); color:var(--ok); border:1px solid #86efac;}
+
+.table-wrap{overflow-x:auto;}
+table{width:100%; border-collapse:collapse; font-size:.85rem;}
+th,td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap;}
+th{color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.03em;}
+tbody tr:hover{background:#fafbfd;}
+.badge{
+  padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; color:#fff;
+  background:var(--badge-color, var(--primary));
+}
+
+.hint{color:var(--muted); font-size:.8rem; font-weight:400;}
+
+/* ---------- maestro de entidades ---------- */
+#tbl-entidades td:nth-child(1){min-width:150px;}
+#tbl-entidades td:nth-child(3){min-width:260px;}
+#tbl-entidades input[type=text]{width:100%;}
+#tbl-entidades input[type=color]{width:44px; height:30px; padding:2px; border:1px solid var(--line); border-radius:6px; cursor:pointer;}
+#tbl-entidades td.center{text-align:center;}
+#tbl-entidades select{width:100%;}
+.ent-config-grid{display:flex; flex-direction:column; gap:6px; font-size:.78rem;}
+.ent-config-grid label{flex-direction:row; align-items:center; justify-content:space-between; gap:6px; font-weight:400; color:var(--ink);}
+.ent-config-grid input[type=time],.ent-config-grid input[type=date]{font-size:.78rem; padding:4px 6px;}
+.ent-config-grid input[type=number]{width:100px; text-align:right;}
+.ent-dias{display:flex; flex-wrap:wrap; gap:6px;}
+.chip-check{
+  background:#eef1f6; border-radius:6px; padding:2px 7px; font-size:.72rem; font-weight:600; gap:4px !important;
+}
+
+.resumen-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;}
+.resumen-item{
+  border:1px solid var(--line); border-radius:10px; padding:14px; background:#fafbfd;
+}
+.resumen-item h3{margin:0 0 8px; font-size:.9rem;}
+.resumen-item .row{display:flex; justify-content:space-between; font-size:.82rem; color:var(--muted); margin:2px 0;}
+.resumen-item .total{font-size:1.15rem; font-weight:800; margin-top:8px; color:var(--ink);}
+
+/* ---------- settings dialog ---------- */
+dialog.app-dialog{
+  border:none; border-radius:14px; padding:0; margin:auto; width:min(640px,92vw); max-height:86vh;
+  background:var(--card); color:var(--ink); box-shadow:0 20px 50px rgba(0,0,0,.25);
+}
+dialog.app-dialog::backdrop{background:rgba(15,23,42,.55);}
+dialog.app-dialog .dlg-header{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:16px 20px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--card); border-radius:14px 14px 0 0;
+}
+dialog.app-dialog .dlg-header h2{margin:0; font-size:1.05rem;}
+dialog.app-dialog .dlg-close{
+  background:transparent; border:none; font-size:1rem; line-height:1; cursor:pointer; color:var(--muted);
+  padding:6px 10px; border-radius:8px;
+}
+dialog.app-dialog .dlg-close:hover{background:#eef1f6;}
+dialog.app-dialog .dlg-body{padding:18px 20px 22px; display:flex; flex-direction:column; gap:24px; overflow-y:auto;}
+dialog.app-dialog .dlg-section h3{margin:0 0 4px; font-size:.95rem;}
+dialog.app-dialog .hint{margin:0 0 10px; display:block;}
+dialog.dialog-wide{width:min(760px,94vw);}
+
+/* ---------- importador masivo ---------- */
+.imp-textarea{
+  width:100%; min-height:130px; resize:vertical; font-family:monospace; font-size:.8rem;
+  padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink);
+  line-height:1.5;
+}
+.tbl-import{width:100%; border-collapse:collapse; font-size:.8rem;}
+.tbl-import th{
+  background:#f5f7fa; text-align:left; padding:7px 10px; font-size:.7rem; font-weight:700;
+  letter-spacing:.03em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); white-space:nowrap;
+}
+.tbl-import td{padding:7px 10px; border-bottom:1px solid var(--line); white-space:nowrap;}
+.tbl-import tr:last-child td{border-bottom:none;}
+.imp-status{
+  display:inline-flex; align-items:center; gap:5px; padding:2px 9px; border-radius:999px; font-size:.72rem; font-weight:700;
+}
+.imp-status.ok{background:var(--ok-bg); color:var(--ok);}
+.imp-status.conflict{background:var(--danger-bg); color:var(--danger);}
+.imp-status.invalid{background:#eef1f6; color:var(--muted);}
+
+/* ---------- calendario mensual ---------- */
+.cal-nav{display:flex; align-items:center; gap:8px;}
+.cal-nav .btn{padding:6px 11px; font-size:.8rem;}
+.cal-label{font-weight:700; font-size:.88rem; min-width:130px; text-align:center;}
+/* En pantallas angostas (celular), 7 columnas con chips no caben sin aplastarse:
+   en vez de deformar la grilla, este contenedor scrollea horizontalmente y
+   .cal-weekdays/.cal-grid mantienen un ancho mínimo razonable por columna. */
+.cal-scroll{overflow-x:auto;}
+.cal-weekdays{
+  display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-bottom:none; border-radius:10px 10px 0 0; overflow:hidden;
+  min-width:700px;
+}
+.cal-weekdays > div{
+  background:#fafbfd; padding:7px 4px; text-align:center; font-size:.68rem; font-weight:700;
+  letter-spacing:.03em; text-transform:uppercase; color:var(--muted);
+}
+.cal-grid{
+  display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:0 0 10px 10px; overflow:hidden;
+  min-width:700px;
+}
+.cal-cell{background:#fff; min-height:104px; padding:5px; display:flex; flex-direction:column; gap:3px; min-width:0;}
+.cal-cell-out{background:var(--bg);}
+.cal-cell-out .cal-daynum{opacity:.45;}
+.cal-cell-today .cal-daynum{
+  background:var(--primary); color:#fff; border-radius:50%; width:20px; height:20px;
+  display:flex; align-items:center; justify-content:center;
+}
+.cal-cell-franja{box-shadow: inset 0 3px 0 var(--franja-color, var(--primary));}
+.cal-daynum{font-size:.75rem; font-weight:700; align-self:flex-start;}
+.cal-chips{display:flex; flex-direction:column; gap:2px;}
+.cal-chip{
+  all:unset; box-sizing:border-box; cursor:pointer; display:block; width:100%;
+  font-size:.64rem; font-weight:600; line-height:1.25;
+  padding:2px 5px; border-radius:5px; white-space:normal; word-break:keep-all;
+  background:color-mix(in srgb, var(--chip-color, var(--primary)) 16%, white);
+  color:var(--chip-color, var(--primary));
+}
+.cal-chip:hover{text-decoration:line-through; filter:brightness(.96);}
+.cal-chip:focus-visible{outline:2px solid var(--primary); outline-offset:1px;}
+/* Chip informativo del bloque fijo (franja horaria): no es un turno registrado, no se elimina. */
+.cal-chip-block{
+  background:transparent; border:1px dashed var(--chip-color, var(--primary)); cursor:default; font-weight:700;
+}
+.cal-chip-block:hover{text-decoration:none; filter:none;}
+
+/* ---------- remitentes por agenda ---------- */
+.eps-label{display:block; margin:2px 0 6px;}
+#f-agenda-rows{display:flex; flex-direction:column; gap:8px; margin-bottom:10px;}
+.eps-row{display:grid; grid-template-columns:1fr 90px auto; gap:8px; align-items:center;}
+.eps-row select{min-width:0;}
+.btn-sm{padding:6px 12px; font-size:.78rem;}
+.btn.ghost-icon{
+  background:transparent; color:var(--danger); border:1px solid var(--line); padding:6px 10px;
+  border-radius:8px; line-height:1;
+}
+.btn.ghost-icon:hover{background:var(--danger-bg);}
+#tbl-remitentes td:first-child{min-width:220px;}
+#tbl-remitentes input[type=text]{width:100%;}
+#tbl-remitentes input[type=number]{width:130px; text-align:right;}
+.resumen-item .row b{color:var(--ink);}
