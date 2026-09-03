@@ -6,7 +6,7 @@
 let PRESTADOR = null;
 let FACTURACION = {}; // { [entidadId]: {razonSocial, nit, direccion, ciudad, telefono} }
 let CUENTAS = [];
-let previewLineas = null; // { entidad, desde, hasta, lineas, total }
+let previewLineas = null; // { entidades, desde, hasta, lineas, total }
 
 // ---------- Alerta local (esta página tiene su propio #alert-box) ----------
 function showAlert(msg, type){
@@ -67,8 +67,9 @@ async function upsertFacturacionDB(entidadId, data){
 
 // ---------- Cuentas de cobro: persistencia (historial, snapshot inmutable) ----------
 function rowToCuenta(row){
+  const entidadIds = (row.entidad_ids && row.entidad_ids.length) ? row.entidad_ids : (row.entidad_id ? [row.entidad_id] : []);
   return {
-    id: row.id, numero: row.numero, entidadId: row.entidad_id,
+    id: row.id, numero: row.numero, entidadIds,
     fechaEmision: row.fecha_emision, periodoDesde: row.periodo_desde, periodoHasta: row.periodo_hasta,
     prestadorSnapshot: row.prestador_snapshot, adquirenteSnapshot: row.adquirente_snapshot,
     lineas: row.lineas, total: Number(row.total), certificacionSnapshot: row.certificacion_snapshot,
@@ -94,7 +95,10 @@ function turnosEnPeriodo(entidadId, desde, hasta){
   return TURNOS.filter(t => t.entidadId === entidadId && t.fecha >= desde && t.fecha <= hasta)
     .sort((a,b)=> turnoInterval(a).start - turnoInterval(b).start);
 }
-function buildLineasPorHora(turnos){
+// `etiqueta` (nombre de la entidad) se agrega al final del concepto solo cuando la
+// cuenta de cobro combina más de una entidad, para poder distinguir de dónde viene
+// cada línea (ej. AUNA SUR y AUNA 80 facturando juntas bajo el mismo NIT).
+function buildLineasPorHora(turnos, etiqueta){
   return turnos.map(t=>{
     const calc = calcularTurno(t);
     const horas = calc.horas;
@@ -104,11 +108,12 @@ function buildLineasPorHora(turnos){
     let tipoTexto = "diurno";
     if (calc.nocMin > 0 && calc.ordMin === 0) tipoTexto = "nocturno";
     else if (calc.nocMin > 0 && calc.ordMin > 0) tipoTexto = "mixto";
-    const concepto = `Turno ${tipoTexto} - ${fechaTexto} (${t.inicio} - ${t.fin})${t.sede ? " - " + t.sede : ""}`;
-    return { cantidad: horas, cantidadTexto: fmtHours(horas), concepto, valorUnit, total: calc.subtotal };
+    let concepto = `Turno ${tipoTexto} - ${fechaTexto} (${t.inicio} - ${t.fin})${t.sede ? " - " + t.sede : ""}`;
+    if (etiqueta) concepto += ` — ${etiqueta}`;
+    return { cantidad: horas, cantidadTexto: fmtHours(horas), concepto, valorUnit, total: calc.subtotal, fecha: t.fecha };
   });
 }
-function buildLineasPorAgenda(turnos){
+function buildLineasPorAgenda(turnos, etiqueta){
   const porRemitente = {};
   for (const t of turnos){
     const calc = calcularTurno(t);
@@ -119,7 +124,9 @@ function buildLineasPorAgenda(turnos){
     }
   }
   return Object.entries(porRemitente).map(([nombre, v])=>({
-    cantidad: v.cantidad, cantidadTexto: String(v.cantidad), concepto: `Consulta ${nombre}`, valorUnit: v.tarifa, total: v.total,
+    cantidad: v.cantidad, cantidadTexto: String(v.cantidad),
+    concepto: `Consulta ${nombre}${etiqueta ? " — " + etiqueta : ""}`,
+    valorUnit: v.tarifa, total: v.total, fecha: null,
   }));
 }
 
@@ -196,15 +203,27 @@ async function handleSaveFacturacion(){
 }
 
 // ---------- UI: generar cuenta de cobro ----------
-function currentGenEntidad(){
-  return getEntidad(document.getElementById("gen-entidad").value);
-}
 function renderGenEntidadOptions(){
-  const sel = document.getElementById("gen-entidad");
-  const cur = sel.value;
+  const wrap = document.getElementById("gen-entidad-checks");
   const opciones = entidadesFacturables();
-  sel.innerHTML = opciones.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join("");
-  if (opciones.some(e=>e.id===cur)) sel.value = cur;
+  const prevChecked = new Set(Array.from(wrap.querySelectorAll("input:checked")).map(i=>i.value));
+  wrap.innerHTML = opciones.map(e=>`
+    <label class="inline chip-check"><input type="checkbox" class="gen-entidad-check" value="${e.id}" ${prevChecked.has(e.id)?"checked":""}> ${esc(e.nombre)}</label>
+  `).join("");
+  wrap.querySelectorAll(".gen-entidad-check").forEach(cb=> cb.addEventListener("change", resetPreview));
+}
+function selectedGenEntidades(){
+  return Array.from(document.querySelectorAll(".gen-entidad-check:checked")).map(cb => getEntidad(cb.value)).filter(Boolean);
+}
+// Si las entidades elegidas comparten el mismo NIT en «Datos de facturación por
+// entidad», usa esos datos. Si tienen NIT distinto, es un conflicto real (no se
+// puede adivinar cuál usar) — se avisa en vez de generar con datos incorrectos.
+function resolveAdquirente(entidades){
+  const llenos = entidades.map(e => FACTURACION[e.id]).filter(f => f && f.nit);
+  if (llenos.length === 0) return { adquirente:null, conflict:false };
+  const nits = new Set(llenos.map(f=>f.nit));
+  if (nits.size > 1) return { adquirente:null, conflict:true };
+  return { adquirente: llenos[0], conflict:false };
 }
 function resetPreview(){
   previewLineas = null;
@@ -222,22 +241,28 @@ function renderPreviewTable(lineas, total){
   document.getElementById("preview-wrap").hidden = false;
 }
 function handlePreview(){
-  const ent = currentGenEntidad();
-  if (!ent){ showAlert("No hay ninguna entidad facturable (por hora o por agenda) activa.", "error"); return; }
+  const entidades = selectedGenEntidades();
+  if (entidades.length === 0){ showAlert("Selecciona al menos una entidad.", "error"); return; }
   const desde = document.getElementById("gen-desde").value;
   const hasta = document.getElementById("gen-hasta").value;
   if (!desde || !hasta){ showAlert("Completa el rango de fechas.", "error"); return; }
   if (desde > hasta){ showAlert("«Desde» no puede ser posterior a «Hasta».", "error"); return; }
 
-  const turnos = turnosEnPeriodo(ent.id, desde, hasta);
-  if (turnos.length === 0){
-    showAlert(`No hay turnos de ${ent.nombre} entre ${desde} y ${hasta}.`, "error");
+  const multi = entidades.length > 1;
+  let lineas = [];
+  for (const ent of entidades){
+    const turnos = turnosEnPeriodo(ent.id, desde, hasta);
+    const etiqueta = multi ? ent.nombre : null;
+    lineas = lineas.concat(ent.tipo === "por_hora" ? buildLineasPorHora(turnos, etiqueta) : buildLineasPorAgenda(turnos, etiqueta));
+  }
+  if (lineas.length === 0){
+    showAlert(`No hay turnos de ${entidades.map(e=>e.nombre).join(" / ")} entre ${desde} y ${hasta}.`, "error");
     resetPreview();
     return;
   }
-  const lineas = ent.tipo === "por_hora" ? buildLineasPorHora(turnos) : buildLineasPorAgenda(turnos);
+  lineas.sort((a,b)=> (a.fecha||"").localeCompare(b.fecha||""));
   const total = lineas.reduce((s,l)=> s + l.total, 0);
-  previewLineas = { entidad: ent, desde, hasta, lineas, total };
+  previewLineas = { entidades, desde, hasta, lineas, total };
   renderPreviewTable(lineas, total);
   document.getElementById("btn-generar").disabled = false;
 }
@@ -310,10 +335,18 @@ function renderInvoice({ numero, fechaEmision, prestador, adquirente, lineas, to
 
 async function handleGenerar(){
   if (!previewLineas) return;
-  const ent = previewLineas.entidad;
-  const fact = FACTURACION[ent.id];
-  if (!fact || !fact.nit){
-    if (!confirm(`No has llenado el NIT/Razón social de "${ent.nombre}" en «Datos de facturación por entidad». ¿Generar de todas formas con esos datos en blanco?`)) return;
+  const entidades = previewLineas.entidades;
+  const nombres = entidades.map(e=>e.nombre).join(" / ");
+
+  const { adquirente: resuelto, conflict } = resolveAdquirente(entidades);
+  if (conflict){
+    showAlert(`"${nombres}" tienen NIT distinto en «Datos de facturación por entidad» — no se pueden combinar así en una sola cuenta de cobro. Ponles el mismo NIT/razón social ahí, o genera una cuenta de cobro separada para cada una.`, "error");
+    return;
+  }
+  let adquirente = resuelto;
+  if (!adquirente){
+    if (!confirm(`No has llenado el NIT/Razón social de "${nombres}" en «Datos de facturación por entidad». ¿Generar de todas formas con esos datos en blanco?`)) return;
+    adquirente = { razonSocial: nombres, nit:"", direccion:"", ciudad:"", telefono:"" };
   }
   if (!PRESTADOR.nombre || !PRESTADOR.identificacion){
     if (!confirm('No has llenado tu nombre/identificación en «Tus datos». ¿Generar de todas formas?')) return;
@@ -322,11 +355,12 @@ async function handleGenerar(){
   try{
     const numero = PRESTADOR.siguienteNumero;
     const fechaEmision = new Date().toISOString().slice(0,10);
-    const adquirente = fact || { razonSocial: ent.nombre, nit:"", direccion:"", ciudad:"", telefono:"" };
+    const entidadIds = entidades.map(e=>e.id);
 
     await insertCuentaCobroDB({
       numero,
-      entidad_id: ent.id,
+      entidad_id: entidadIds[0],
+      entidad_ids: entidadIds,
       fecha_emision: fechaEmision,
       periodo_desde: previewLineas.desde,
       periodo_hasta: previewLineas.hasta,
@@ -354,8 +388,8 @@ async function handleGenerar(){
 function renderHistorial(){
   const tbody = document.getElementById("historial-rows");
   tbody.innerHTML = CUENTAS.map(c=>{
-    const ent = getEntidad(c.entidadId);
-    const nombre = ent ? ent.nombre : (c.adquirenteSnapshot ? c.adquirenteSnapshot.razonSocial : "?");
+    const nombres = c.entidadIds.map(id => getEntidad(id)).filter(Boolean).map(e=>e.nombre);
+    const nombre = nombres.length ? nombres.join(" + ") : (c.adquirenteSnapshot ? c.adquirenteSnapshot.razonSocial : "?");
     return `<tr>
       <td>${String(c.numero).padStart(3,"0")}</td>
       <td>${c.fechaEmision}</td>
@@ -417,7 +451,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.getElementById("btn-save-prestador").addEventListener("click", handleSavePrestador);
   document.getElementById("fact-entidad-select").addEventListener("change", loadFacturacionIntoForm);
   document.getElementById("btn-save-facturacion").addEventListener("click", handleSaveFacturacion);
-  document.getElementById("gen-entidad").addEventListener("change", resetPreview);
   document.getElementById("btn-preview").addEventListener("click", handlePreview);
   document.getElementById("btn-generar").addEventListener("click", handleGenerar);
   document.getElementById("btn-print").addEventListener("click", ()=> window.print());

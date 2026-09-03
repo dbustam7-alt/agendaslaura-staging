@@ -126,10 +126,10 @@
   <!-- GENERAR CUENTA DE COBRO -->
   <section class="card no-print">
     <h2>➕ Generar cuenta de cobro</h2>
+    <label class="eps-label">Entidad(es)</label>
+    <p class="hint" style="margin:0 0 8px;">Marca varias si comparten el mismo NIT/cliente (ej. AUNA SUR y AUNA 80): salen combinadas en una sola cuenta de cobro, con cada línea indicando de cuál entidad viene.</p>
+    <div id="gen-entidad-checks" style="display:flex; flex-wrap:wrap; gap:14px; margin-bottom:12px;"></div>
     <div class="cc-grid">
-      <label>Entidad
-        <select id="gen-entidad"></select>
-      </label>
       <label>Desde
         <input type="date" id="gen-desde">
       </label>
