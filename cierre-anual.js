@@ -11,6 +11,9 @@ function showAlert(msg, type){
   box.className = "alert " + type;
   box.textContent = (type === "error" ? "⚠️ " : "✅ ") + msg;
 }
+function hideAlert(){
+  document.getElementById("alert-box").hidden = true;
+}
 
 // A qué entidad pertenece una línea: preferir el entidadId propio de la línea (cuentas
 // nuevas); si no lo tiene (cuentas viejas) y la cuenta de cobro es de una sola entidad,
@@ -51,6 +54,7 @@ function computeCierre(anio){
 }
 
 function renderCierre(anio){
+  hideAlert(); // limpia cualquier aviso de un cálculo anterior (ej. "sin cuentas de cobro" de otro año)
   const { cuentasDelAnio, totales, porEntidad } = computeCierre(anio);
 
   document.getElementById("ca-titulo").textContent = `Cierre ${anio}`;
