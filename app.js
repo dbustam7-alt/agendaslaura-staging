@@ -468,7 +468,7 @@ function renderCalendar(){
       const ent = getEntidad(t.entidadId);
       const nombre = ent ? ent.nombre : "?";
       const color = ent ? ent.color : "#94a3b8";
-      const title = `${nombre} ${t.inicio}–${t.fin} · ${calc.detalle}${calc.subtotal ? " · " + fmtMoney(calc.subtotal) : ""}`;
+      const title = `${nombre} ${esc(t.inicio)}–${esc(t.fin)} · ${calc.detalle}${calc.subtotal ? " · " + fmtMoney(calc.subtotal) : ""}`;
       return `<button type="button" class="cal-chip" style="--chip-color:${color}" data-del="${t.id}" title="${esc(title)} — clic para eliminar">${t.inicio}–${t.fin} ${esc(nombre)}</button>`;
     }).join("");
 

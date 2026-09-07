@@ -387,27 +387,31 @@ function turnoToRow(t){
     proyecto_id: PROYECTO_ACTUAL.id,
   };
 }
-async function saveDetalle(turnoId, detalle){
-  const rows = (detalle || []).filter(d => d.cantidad > 0 && d.remitenteId).map(d => ({
-    turno_id: turnoId, remitente_id: d.remitenteId, cantidad: d.cantidad,
+// Arma el detalle de un turno como jsonb para las RPC atómicas de abajo.
+function detalleToJsonb(detalle){
+  return (detalle || []).filter(d => d.cantidad > 0 && d.remitenteId).map(d => ({
+    remitente_id: d.remitenteId, cantidad: d.cantidad,
     nombre_paciente: d.nombrePaciente || null,
     valor: d.tarifa != null ? d.tarifa : null,
-    proyecto_id: PROYECTO_ACTUAL.id,
   }));
-  if (rows.length === 0) return;
-  const { error } = await sb.from("turno_detalle").insert(rows);
-  if (error) throw error;
 }
 async function fetchTurnos(){
   const { data, error } = await sb.from("turnos").select(TURNO_SELECT).eq("proyecto_id", PROYECTO_ACTUAL.id).order("fecha").order("inicio");
   if (error){ showAlert("Error cargando turnos: " + error.message, "error"); return []; }
   return data.map(rowToTurno);
 }
+// Encabezado + detalle se crean en UNA sola transacción de Postgres (RPC
+// crear_turno_con_detalle) — antes eran 2 llamadas HTTP separadas: si la
+// conexión fallaba justo entre insertar el turno y guardar su detalle, quedaba
+// un turno "huérfano" sin sus pacientes/remitentes.
 async function insertTurnoDB(t){
-  const { data, error } = await sb.from("turnos").insert(turnoToRow(t)).select().single();
+  const { data: id, error } = await sb.rpc("crear_turno_con_detalle", {
+    p_proyecto_id: PROYECTO_ACTUAL.id, p_entidad_id: t.entidadId, p_fecha: t.fecha,
+    p_inicio: t.inicio, p_fin: t.fin, p_sede: t.sede || null,
+    p_detalle: detalleToJsonb(t.detalle),
+  });
   if (error) throw error;
-  if (t.detalle && t.detalle.length) await saveDetalle(data.id, t.detalle);
-  const { data: full, error: err2 } = await sb.from("turnos").select(TURNO_SELECT).eq("id", data.id).single();
+  const { data: full, error: err2 } = await sb.from("turnos").select(TURNO_SELECT).eq("id", id).single();
   if (err2) throw err2;
   return rowToTurno(full);
 }
@@ -415,24 +419,37 @@ async function insertTurnosBulkDB(list){
   const { data, error } = await sb.from("turnos").insert(list.map(turnoToRow)).select();
   if (error) throw error;
   // Supabase devuelve las filas insertadas en el mismo orden que se enviaron.
+  // El detalle de TODOS los turnos del lote se manda en un único insert masivo
+  // (antes era un insert de turno_detalle por cada turno del lote) — así una
+  // falla de red a mitad de la importación no puede dejar unos turnos con su
+  // detalle guardado y otros sin él.
+  const detalleRows = [];
   for (let i = 0; i < data.length; i++){
-    if (list[i].detalle && list[i].detalle.length){
-      await saveDetalle(data[i].id, list[i].detalle);
+    for (const d of detalleToJsonb(list[i].detalle)){
+      detalleRows.push({ turno_id: data[i].id, remitente_id: d.remitente_id, cantidad: d.cantidad, nombre_paciente: d.nombre_paciente, valor: d.valor, proyecto_id: PROYECTO_ACTUAL.id });
     }
+  }
+  if (detalleRows.length){
+    const { error: errDet } = await sb.from("turno_detalle").insert(detalleRows);
+    if (errDet) throw errDet;
   }
   const ids = data.map(r => r.id);
   const { data: full, error: err2 } = await sb.from("turnos").select(TURNO_SELECT).in("id", ids);
   if (err2) throw err2;
   return full.map(rowToTurno);
 }
+// Igual que insertTurnoDB: actualizar el encabezado y reemplazar el detalle
+// (borrar lo anterior + insertar lo nuevo) corre como UNA sola transacción
+// (RPC actualizar_turno_con_detalle) — antes, si la conexión fallaba justo
+// entre el DELETE y el INSERT, el turno se quedaba SIN NINGÚN detalle (pérdida
+// real de datos ya guardados, no solo un guardado incompleto).
 async function updateTurnoDB(id, t){
-  const { error } = await sb.from("turnos").update(turnoToRow(t)).eq("id", id);
+  const { error } = await sb.rpc("actualizar_turno_con_detalle", {
+    p_turno_id: id, p_entidad_id: t.entidadId, p_fecha: t.fecha,
+    p_inicio: t.inicio, p_fin: t.fin, p_sede: t.sede || null,
+    p_detalle: detalleToJsonb(t.detalle),
+  });
   if (error) throw error;
-  // El detalle por remitente se reemplaza por completo: se borra lo anterior y se
-  // inserta lo nuevo, así no hace falta comparar filas una por una.
-  const { error: delErr } = await sb.from("turno_detalle").delete().eq("turno_id", id);
-  if (delErr) throw delErr;
-  if (t.detalle && t.detalle.length) await saveDetalle(id, t.detalle);
   const { data: full, error: err2 } = await sb.from("turnos").select(TURNO_SELECT).eq("id", id).single();
   if (err2) throw err2;
   return rowToTurno(full);
