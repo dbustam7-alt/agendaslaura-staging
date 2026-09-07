@@ -314,12 +314,12 @@ function renderCierre(anio){
       const pagada = c.estado === "pagada";
       return `<tr>
         <td>${String(c.numero).padStart(3,"0")}</td>
-        <td>${c.fechaEmision}</td>
+        <td>${esc(c.fechaEmision)}</td>
         <td>${esc(nombre)}</td>
         <td>${fmtMoney(c.total)}</td>
         <td>${fmtMoney(c.neto)}</td>
         <td><span class="imp-status ${pagada ? "ok" : "conflict"}">${pagada ? "Pagada" : "Pendiente"}</span></td>
-        <td>${c.fechaPago || "—"}</td>
+        <td>${esc(c.fechaPago) || "—"}</td>
       </tr>`;
     }).join("");
     detalleWrap.hidden = false;

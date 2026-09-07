@@ -180,9 +180,16 @@ async function fetchCuentasCobro(){
   if (error){ showAlert("Error cargando el historial: " + error.message, "error"); return []; }
   return data.map(rowToCuenta);
 }
+// `row.numero` NO se envía: el número consecutivo lo asigna un trigger de la base
+// de datos (asignar_numero_cuenta_cobro), de forma atómica dentro de la misma
+// transacción de insert — así dos personas generando una cuenta de cobro casi al
+// mismo tiempo nunca pueden terminar con el mismo número. Se devuelve la fila
+// insertada completa para que el llamador sepa qué número le tocó.
 async function insertCuentaCobroDB(row){
-  const { error } = await sb.from("cuentas_cobro").insert({ ...row, proyecto_id: PROYECTO_ACTUAL.id });
+  const { numero, ...resto } = row;
+  const { data, error } = await sb.from("cuentas_cobro").insert({ ...resto, proyecto_id: PROYECTO_ACTUAL.id }).select().single();
   if (error) throw error;
+  return rowToCuenta(data);
 }
 async function deleteCuentaCobroDB(id){
   const { error } = await sb.from("cuentas_cobro").delete().eq("id", id);
@@ -202,14 +209,16 @@ async function fetchEntidades(){
   if (error){ showAlert("Error cargando entidades: " + error.message, "error"); return []; }
   return data.map(rowToEntidad);
 }
-async function insertEntidadDB(e){
-  const { error } = await sb.from("entidades").insert({ nombre:e.nombre, tipo:e.tipo, color:e.color, config:e.config, orden:e.orden, activo:e.activo, proyecto_id: PROYECTO_ACTUAL.id });
-  if (error) throw error;
-}
-async function updateEntidadDB(id, e){
-  // El tipo no se puede cambiar una vez creada la entidad: cambiarlo corrompería
-  // la validación y facturación de los turnos ya registrados con ese tipo.
-  const { error } = await sb.from("entidades").update({ nombre:e.nombre, color:e.color, config:e.config, activo:e.activo }).eq("id", id);
+// Guarda TODAS las filas del formulario en una sola operación (upsert masivo) en
+// vez de un insert/update por fila: si la conexión se cae a mitad de guardar
+// varias entidades, con un for-loop podían quedar unas guardadas y otras no — y
+// como el formulario no se enteraba de cuáles sí alcanzaron a insertarse, un
+// reintento podía duplicarlas. Un solo upsert es atómico: se guardan todas o
+// ninguna. `rows` ya trae el `tipo` correcto por fila (el llamador se encarga de
+// no dejarlo cambiar en filas existentes).
+async function upsertEntidadesDB(rows){
+  const payload = rows.map(r => ({ ...r, proyecto_id: PROYECTO_ACTUAL.id }));
+  const { error } = await sb.from("entidades").upsert(payload);
   if (error) throw error;
 }
 async function deleteEntidadDB(id){
@@ -333,13 +342,12 @@ async function fetchRemitentes(){
   if (error){ showAlert("Error cargando remitentes: " + error.message, "error"); return []; }
   return data.map(r => ({ id: r.id, nombre: r.nombre, tarifa: Number(r.tarifa), orden: r.orden, entidadId: r.entidad_id }));
 }
-async function insertRemitenteDB(entidadId, nombre, tarifa){
-  const orden = remitentesDeEntidad(entidadId).length;
-  const { error } = await sb.from("remitentes").insert({ nombre, tarifa, orden, activo:true, entidad_id: entidadId, proyecto_id: PROYECTO_ACTUAL.id });
-  if (error) throw error;
-}
-async function updateRemitenteDB(id, nombre, tarifa){
-  const { error } = await sb.from("remitentes").update({ nombre, tarifa }).eq("id", id);
+// Mismo motivo que upsertEntidadesDB: un solo upsert atómico en vez de un
+// insert/update por fila, para no arriesgar guardados parciales ni duplicados en
+// un reintento tras un error de red a mitad del guardado.
+async function upsertRemitentesDB(rows){
+  const payload = rows.map(r => ({ ...r, proyecto_id: PROYECTO_ACTUAL.id }));
+  const { error } = await sb.from("remitentes").upsert(payload);
   if (error) throw error;
 }
 
@@ -435,6 +443,18 @@ async function deleteTurnoDB(id){
 }
 
 // ---------- Helpers de fecha/hora ----------
+// `new Date().toISOString().slice(0,10)` da la fecha en UTC, no la del usuario —
+// en Colombia (UTC-5), desde las 7pm hora local eso ya cae en el DÍA SIGUIENTE en
+// UTC, así que "hoy" quedaría mal (ej. registrar un turno nocturno a las 8pm
+// precargaría la fecha de mañana). Esta función arma el ISO con los componentes
+// LOCALES del Date (getFullYear/getMonth/getDate), nunca con UTC.
+function getLocalDateISO(d){
+  d = d || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function parseTimeParts(hhmm){
   const [h,m] = hhmm.split(":").map(Number);
   return [h,m,0,0];
@@ -485,7 +505,7 @@ function franjaBlocksInRange(start, end){
   let d = new Date(start); d.setHours(0,0,0,0);
   const last = new Date(end);
   while (d.getTime() <= last.getTime()){
-    const iso = d.toISOString().slice(0,10);
+    const iso = getLocalDateISO(d);
     for (const ent of franjaEntidades){
       const b = franjaBlockForDate(ent, iso);
       if (b) blocks.push(b);

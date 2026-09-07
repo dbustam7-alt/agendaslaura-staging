@@ -224,8 +224,8 @@ async function enterApp(){
   renderImportEntidadOptions();
   loadDeduccionesIntoForm();
 
-  document.getElementById("f-fecha").value = new Date().toISOString().slice(0,10);
-  document.getElementById("filter-month").value = new Date().toISOString().slice(0,7);
+  document.getElementById("f-fecha").value = getLocalDateISO();
+  document.getElementById("filter-month").value = getLocalDateISO().slice(0,7);
 
   renderAll();
 }
@@ -317,11 +317,11 @@ function renderAgenda(){
         <button class="btn secondary btn-sm" data-edit="${t.id}">Editar</button>
         <button class="btn danger-link" data-del="${t.id}">Eliminar</button>
       </td>
-      <td>${t.fecha}</td>
+      <td>${esc(t.fecha)}</td>
       <td>${DIAS[d.getDay()]}</td>
       <td><span class="badge" style="--badge-color:${color}">${esc(nombre)}</span></td>
-      <td>${t.inicio}</td>
-      <td>${t.fin}</td>
+      <td>${esc(t.inicio)}</td>
+      <td>${esc(t.fin)}</td>
       <td>${fmtHours(calc.horas)}</td>
       <td>${calc.subtotal ? fmtMoney(calc.subtotal) : "—"}</td>
       <td>${esc(calc.detalle)}</td>
@@ -420,7 +420,7 @@ function renderResumen(){
 }
 
 // ---------- Calendario mensual ----------
-let calendarMonth = new Date().toISOString().slice(0,7); // "YYYY-MM"
+let calendarMonth = getLocalDateISO().slice(0,7); // "YYYY-MM"
 
 function renderCalendar(){
   const [y, m] = calendarMonth.split("-").map(Number);
@@ -432,7 +432,7 @@ function renderCalendar(){
   const gridStart = new Date(firstOfMonth);
   gridStart.setDate(gridStart.getDate() - firstWeekday);
 
-  const todayISO = new Date().toISOString().slice(0,10);
+  const todayISO = getLocalDateISO();
   const byDate = {};
   for (const t of TURNOS) (byDate[t.fecha] = byDate[t.fecha] || []).push(t);
   for (const arr of Object.values(byDate)) arr.sort((a,b)=> a.inicio.localeCompare(b.inicio));
@@ -440,7 +440,7 @@ function renderCalendar(){
   let html = "";
   const cursor = new Date(gridStart);
   for (let i = 0; i < 42; i++){
-    const iso = cursor.toISOString().slice(0,10);
+    const iso = getLocalDateISO(cursor);
     const inMonth = cursor.getMonth() === monthIndex0;
     const isToday = iso === todayISO;
     const franjaEnts = franjaEntidadesForDate(iso);
@@ -502,7 +502,7 @@ function renderCalendar(){
 function shiftCalendarMonth(delta){
   const [y,m] = calendarMonth.split("-").map(Number);
   const d = new Date(y, m-1+delta, 1);
-  calendarMonth = d.toISOString().slice(0,7);
+  calendarMonth = getLocalDateISO(d).slice(0,7);
   renderCalendar();
 }
 
@@ -681,7 +681,7 @@ function cancelEditTurno(){
   editingTurnoId = null;
   document.getElementById("btn-add-turno").textContent = "Registrar turno";
   document.getElementById("btn-cancel-edit").hidden = true;
-  document.getElementById("f-fecha").value = new Date().toISOString().slice(0,10);
+  document.getElementById("f-fecha").value = getLocalDateISO();
   document.getElementById("f-inicio").value = "";
   document.getElementById("f-fin").value = "";
   document.getElementById("f-sede").value = "";
@@ -775,17 +775,27 @@ function addEntidadMaestroRow(){
 async function saveEntidadesMaestro(){
   const rows = Array.from(document.querySelectorAll("#entidades-rows tr"));
   try{
+    const payload = [];
+    let nuevoOrden = ENTIDADES.length; // filas nuevas del mismo guardado quedan en orden de aparición, no todas con el mismo número
     for (const tr of rows){
       const nombre = tr.querySelector(".ent-nombre").value.trim();
       if (!nombre) continue;
-      const tipo = tr.dataset.tipo;
+      const id = tr.dataset.id;
+      const actual = id ? getEntidad(id) : null;
+      // El tipo no se puede cambiar una vez creada la entidad: en filas existentes
+      // se conserva el que ya tenía, nunca el del selector (que queda deshabilitado
+      // en pantalla, pero por si acaso).
+      const tipo = actual ? actual.tipo : tr.dataset.tipo;
       const color = tr.querySelector(".ent-color").value;
       const activo = tr.querySelector(".ent-activo").checked;
       const config = collectEntidadConfigFromRow(tr, tipo);
-      const id = tr.dataset.id;
-      if (id) await updateEntidadDB(id, { nombre, color, activo, config });
-      else await insertEntidadDB({ nombre, tipo, color, config, orden: ENTIDADES.length, activo });
+      payload.push({
+        ...(id ? { id } : {}),
+        nombre, tipo, color, config, activo,
+        orden: actual ? actual.orden : nuevoOrden++,
+      });
     }
+    if (payload.length) await upsertEntidadesDB(payload);
     ENTIDADES = await fetchEntidades();
     renderEntidadesMaestro();
     renderRemitenteEntidadSelector();
@@ -888,14 +898,21 @@ async function saveRemitentesMaestro(){
   }
   const rows = Array.from(document.querySelectorAll("#remitentes-rows tr"));
   try{
+    const payload = [];
+    let nuevoOrden = remitentesDeEntidad(entidadId).length; // ídem: filas nuevas del mismo guardado no repiten orden
     for (const row of rows){
       const nombre = row.querySelector(".rem-nombre").value.trim();
       const tarifa = Number(row.querySelector(".rem-tarifa").value || 0);
       if (!nombre) continue;
       const id = row.dataset.id;
-      if (id) await updateRemitenteDB(id, nombre, tarifa);
-      else await insertRemitenteDB(entidadId, nombre, tarifa);
+      const actual = id ? REMITENTES.find(r=>r.id===id) : null;
+      payload.push({
+        ...(id ? { id } : {}),
+        nombre, tarifa, activo: true, entidad_id: entidadId,
+        orden: actual ? actual.orden : nuevoOrden++,
+      });
     }
+    if (payload.length) await upsertRemitentesDB(payload);
     REMITENTES = await fetchRemitentes();
     renderRemitentesMaestro();
     renderAgendaFormOptions();
@@ -1168,7 +1185,7 @@ async function commitImport(){
 
 // ---------- Exportación cierre de mes ----------
 function toCsv(){
-  const month = document.getElementById("filter-month").value || new Date().toISOString().slice(0,7);
+  const month = document.getElementById("filter-month").value || getLocalDateISO().slice(0,7);
   const list = TURNOS.filter(t => t.fecha.slice(0,7) === month)
     .sort((a,b)=> turnoInterval(a).start - turnoInterval(b).start);
   const rows = [["Fecha","Entidad","Sede","Inicio","Fin","Horas","Detalle","Bruto","Seg. Social","Vacaciones","Cesantías","Retefuente","Neto"]];
@@ -1204,7 +1221,7 @@ function downloadExcel(){
     showAlert("No se pudo cargar la librería de Excel (sin conexión a internet). Usa CSV mientras tanto.", "error");
     return;
   }
-  const month = document.getElementById("filter-month").value || new Date().toISOString().slice(0,7);
+  const month = document.getElementById("filter-month").value || getLocalDateISO().slice(0,7);
   const list = TURNOS.filter(t => t.fecha.slice(0,7) === month)
     .sort((a,b)=> turnoInterval(a).start - turnoInterval(b).start);
 
@@ -1321,12 +1338,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.getElementById("cal-prev").addEventListener("click", ()=> shiftCalendarMonth(-1));
   document.getElementById("cal-next").addEventListener("click", ()=> shiftCalendarMonth(1));
   document.getElementById("cal-today").addEventListener("click", ()=>{
-    calendarMonth = new Date().toISOString().slice(0,7);
+    calendarMonth = getLocalDateISO().slice(0,7);
     renderCalendar();
   });
 
   document.getElementById("btn-export-csv").addEventListener("click", ()=>{
-    const month = document.getElementById("filter-month").value || new Date().toISOString().slice(0,7);
+    const month = document.getElementById("filter-month").value || getLocalDateISO().slice(0,7);
     downloadFile(`cierre-mes-${month}.csv`, toCsv(), "text/csv;charset=utf-8;");
   });
   document.getElementById("btn-export-xlsx").addEventListener("click", downloadExcel);

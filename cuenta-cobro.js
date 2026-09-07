@@ -387,15 +387,16 @@ async function handleGenerar(){
   }
 
   try{
-    const numero = PRESTADOR.siguienteNumero;
-    const fechaEmision = new Date().toISOString().slice(0,10);
+    const fechaEmision = getLocalDateISO();
     const entidadIds = entidades.map(e=>e.id);
     // Las deducciones y el neto quedan congelados con los % vigentes HOY — así el
     // cierre anual nunca se distorsiona si más adelante cambian esos porcentajes.
     const ded = calcDeducciones(previewLineas.total);
 
-    await insertCuentaCobroDB({
-      numero,
+    // El número consecutivo NO se calcula aquí: lo asigna de forma atómica un
+    // trigger de la base de datos al insertar (ver asignar_numero_cuenta_cobro),
+    // así dos personas generando una cuenta de cobro a la vez nunca chocan.
+    const guardada = await insertCuentaCobroDB({
       entidad_id: entidadIds[0],
       entidad_ids: entidadIds,
       fecha_emision: fechaEmision,
@@ -409,7 +410,9 @@ async function handleGenerar(){
       deducciones_snapshot: { segSocial: ded.segSocial, vacaciones: ded.vacaciones, cesantias: ded.cesantias, retefuente: ded.retefuente, total: ded.total },
       neto: ded.neto,
     });
-    await bumpSiguienteNumero(numero + 1);
+    const numero = guardada.numero;
+    // El trigger ya subió prestador.siguiente_numero en la base — aquí solo se
+    // refleja en pantalla, no se vuelve a escribir (evitaría doble incremento).
     PRESTADOR.siguienteNumero = numero + 1;
     document.getElementById("pr-siguiente-numero").value = PRESTADOR.siguienteNumero;
 
@@ -470,12 +473,12 @@ function renderHistorial(){
     const pagada = c.estado === "pagada";
     return `<tr>
       <td>${String(c.numero).padStart(3,"0")}</td>
-      <td>${c.fechaEmision}</td>
+      <td>${esc(c.fechaEmision)}</td>
       <td>${esc(nombre)}</td>
-      <td>${c.periodoDesde} – ${c.periodoHasta}</td>
+      <td>${esc(c.periodoDesde)} – ${esc(c.periodoHasta)}</td>
       <td>${fmtMoney(c.total)}</td>
       <td><span class="imp-status ${pagada ? "ok" : "conflict"}">${pagada ? "Pagada" : "Pendiente"}</span></td>
-      <td>${c.fechaPago || "—"}</td>
+      <td>${esc(c.fechaPago) || "—"}</td>
       <td style="white-space:nowrap;">
         <button type="button" class="btn secondary btn-sm" data-ver="${c.id}">Ver / Reimprimir</button>
         <button type="button" class="btn secondary btn-sm" data-toggle-estado="${c.id}">${pagada ? "Marcar pendiente" : "Marcar pagada"}</button>
@@ -509,7 +512,7 @@ async function handleToggleEstado(id){
     if (c.estado === "pagada"){
       await updateEstadoCuentaDB(id, "pendiente", null);
     } else {
-      const hoy = new Date().toISOString().slice(0,10);
+      const hoy = getLocalDateISO();
       const fecha = prompt(`Fecha de pago de la cuenta de cobro N° ${String(c.numero).padStart(3,"0")}:`, hoy);
       if (fecha === null) return; // canceló
       await updateEstadoCuentaDB(id, "pagada", fecha || hoy);
@@ -578,8 +581,8 @@ async function enterPage(){
   renderHistorial();
 
   const hoy = new Date();
-  document.getElementById("gen-desde").value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0,10);
-  document.getElementById("gen-hasta").value = hoy.toISOString().slice(0,10);
+  document.getElementById("gen-desde").value = getLocalDateISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+  document.getElementById("gen-hasta").value = getLocalDateISO(hoy);
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{
