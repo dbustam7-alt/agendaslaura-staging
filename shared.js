@@ -415,24 +415,18 @@ async function insertTurnoDB(t){
   if (err2) throw err2;
   return rowToTurno(full);
 }
+// Todo el lote (encabezados + detalle de cada turno) se crea en UNA sola
+// transacción (RPC importar_turnos_lote) — antes eran 2+ llamadas HTTP (un
+// insert de encabezados + un insert de detalle por cada turno del lote), así
+// que una falla de red a mitad de la importación podía dejar turnos ya creados
+// sin su detalle. Con la RPC, o se guarda el lote completo, o ninguno.
 async function insertTurnosBulkDB(list){
-  const { data, error } = await sb.from("turnos").insert(list.map(turnoToRow)).select();
+  const payload = list.map(t => ({
+    entidad_id: t.entidadId, fecha: t.fecha, inicio: t.inicio, fin: t.fin, sede: t.sede || null,
+    detalle: detalleToJsonb(t.detalle),
+  }));
+  const { data, error } = await sb.rpc("importar_turnos_lote", { p_proyecto_id: PROYECTO_ACTUAL.id, p_turnos: payload });
   if (error) throw error;
-  // Supabase devuelve las filas insertadas en el mismo orden que se enviaron.
-  // El detalle de TODOS los turnos del lote se manda en un único insert masivo
-  // (antes era un insert de turno_detalle por cada turno del lote) — así una
-  // falla de red a mitad de la importación no puede dejar unos turnos con su
-  // detalle guardado y otros sin él.
-  const detalleRows = [];
-  for (let i = 0; i < data.length; i++){
-    for (const d of detalleToJsonb(list[i].detalle)){
-      detalleRows.push({ turno_id: data[i].id, remitente_id: d.remitente_id, cantidad: d.cantidad, nombre_paciente: d.nombre_paciente, valor: d.valor, proyecto_id: PROYECTO_ACTUAL.id });
-    }
-  }
-  if (detalleRows.length){
-    const { error: errDet } = await sb.from("turno_detalle").insert(detalleRows);
-    if (errDet) throw errDet;
-  }
   const ids = data.map(r => r.id);
   const { data: full, error: err2 } = await sb.from("turnos").select(TURNO_SELECT).in("id", ids);
   if (err2) throw err2;

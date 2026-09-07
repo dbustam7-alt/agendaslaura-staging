@@ -79,16 +79,10 @@ async function upsertFacturacionDB(entidadId, data){
 
 // El próximo número siempre es (el más alto que quede) + 1 — así borrar una de prueba
 // libera su número para la próxima vez, sin arriesgar que dos cuentas de cobro
-// terminen compartiendo el mismo número.
-async function recomputeSiguienteNumero(){
-  const maxNumero = CUENTAS.reduce((m,c)=> Math.max(m, c.numero), 0);
-  const correcto = maxNumero + 1;
-  if (PRESTADOR.siguienteNumero !== correcto){
-    PRESTADOR.siguienteNumero = correcto;
-    document.getElementById("pr-siguiente-numero").value = correcto;
-    await bumpSiguienteNumero(correcto);
-  }
-}
+// terminen compartiendo el mismo número. Este recálculo YA NO se hace desde el
+// cliente: un trigger AFTER DELETE (fn_reajustar_consecutivo_delete) lo hace
+// dentro de la misma transacción del borrado — el cliente solo tiene que volver
+// a leer `prestador` (ver handleDeleteCuenta) para reflejar el valor oficial.
 // Chequeo de seguridad al cargar (no al borrar): si el número guardado ya se quedó
 // corto frente a lo que hay (nunca debería pasar, pero por si acaso) lo sube para
 // no arriesgar un choque de números — nunca lo baja solo por cargar la página.
@@ -529,8 +523,12 @@ async function handleDeleteCuenta(id){
   if (!confirm(`¿Eliminar definitivamente la cuenta de cobro N° ${String(c.numero).padStart(3,"0")}?\n\nEsto no se puede deshacer. El próximo número se ajusta solo para no dejar huecos raros.`)) return;
   try{
     await deleteCuentaCobroDB(id);
+    // El trigger AFTER DELETE ya reajustó prestador.siguiente_numero dentro de
+    // la misma transacción del borrado — aquí solo se vuelve a leer el valor
+    // oficial, nunca se calcula ni se escribe desde el cliente.
     CUENTAS = await fetchCuentasCobro();
-    await recomputeSiguienteNumero();
+    PRESTADOR = await fetchPrestador();
+    document.getElementById("pr-siguiente-numero").value = PRESTADOR.siguienteNumero;
     renderHistorial();
     showAlert(`Cuenta de cobro N° ${String(c.numero).padStart(3,"0")} eliminada. Próximo número: ${String(PRESTADOR.siguienteNumero).padStart(3,"0")}.`, "ok");
   }catch(e){
