@@ -115,9 +115,11 @@ function buildLineasPorHora(turnos, etiqueta){
     const valorUnit = horas > 0 ? calc.subtotal / horas : 0;
     const d = new Date(t.fecha + "T00:00:00");
     const fechaTexto = `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
+    const categoriasPresentes = [calc.ordMin > 0, calc.nocMin > 0, calc.domFestMin > 0].filter(Boolean).length;
     let tipoTexto = "diurno";
-    if (calc.nocMin > 0 && calc.ordMin === 0) tipoTexto = "nocturno";
-    else if (calc.nocMin > 0 && calc.ordMin > 0) tipoTexto = "mixto";
+    if (categoriasPresentes > 1) tipoTexto = "mixto";
+    else if (calc.domFestMin > 0) tipoTexto = "dominical/festivo";
+    else if (calc.nocMin > 0) tipoTexto = "nocturno";
     let concepto = `Turno ${tipoTexto} - ${fechaTexto} (${t.inicio} - ${t.fin})${t.sede ? " - " + t.sede : ""}`;
     if (etiqueta) concepto += ` — ${etiqueta}`;
     return { cantidad: horas, cantidadTexto: fmtHours(horas), concepto, valorUnit, total: calc.subtotal, fecha: t.fecha, entidadId: t.entidadId, entidadNombre: etiqueta || getEntidad(t.entidadId)?.nombre };

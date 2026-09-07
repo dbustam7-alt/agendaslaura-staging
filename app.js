@@ -352,12 +352,12 @@ function renderResumen(){
   for (const t of list){
     const ent = getEntidad(t.entidadId);
     if (!ent) continue;
-    if (!acc[ent.id]) acc[ent.id] = { entidad: ent, horas:0, subtotal:0, ordMin:0, nocMin:0, porRemitente:{} };
+    if (!acc[ent.id]) acc[ent.id] = { entidad: ent, horas:0, subtotal:0, ordMin:0, nocMin:0, domFestMin:0, porRemitente:{} };
     const calc = calcularTurno(t);
     const a = acc[ent.id];
     a.horas += calc.horas;
     a.subtotal += calc.subtotal;
-    if (ent.tipo === "por_hora"){ a.ordMin += calc.ordMin; a.nocMin += calc.nocMin; }
+    if (ent.tipo === "por_hora"){ a.ordMin += calc.ordMin; a.nocMin += calc.nocMin; a.domFestMin += calc.domFestMin; }
     if (ent.tipo === "por_agenda"){
       for (const d of (calc.detalleLista || [])){
         const cur = a.porRemitente[d.nombre] || {cantidad:0, subtotal:0};
@@ -391,7 +391,8 @@ function renderResumen(){
     } else if (e.tipo === "por_hora"){
       body = `
         <div class="row"><span>Horas ordinarias</span><span>${fmtHours(a.ordMin/60)} h</span></div>
-        <div class="row"><span>Horas nocturno/fin de semana</span><span>${fmtHours(a.nocMin/60)} h</span></div>
+        <div class="row"><span>Horas nocturnas</span><span>${fmtHours(a.nocMin/60)} h</span></div>
+        <div class="row"><span>Horas domingo/festivo</span><span>${fmtHours(a.domFestMin/60)} h</span></div>
         ${deduccionesRows(a.subtotal)}`;
     } else {
       const rows = Object.entries(a.porRemitente).sort((x,y)=> y[1].subtotal - x[1].subtotal)
@@ -708,10 +709,12 @@ function buildEntidadConfigFields(tipo, cfg){
     return `
       <div class="ent-config-grid">
         <label>Tarifa ordinaria ($/h)<input type="number" class="ent-tarifa-ord" value="${cfg.tarifaOrd ?? 0}" step="1000"></label>
-        <label>Tarifa nocturna/finde ($/h)<input type="number" class="ent-tarifa-noc" value="${cfg.tarifaNoc ?? 0}" step="1000"></label>
+        <label>Tarifa nocturna ($/h)<input type="number" class="ent-tarifa-noc" value="${cfg.tarifaNoc ?? 0}" step="1000"></label>
+        <label>Tarifa domingos/festivos ($/h)<input type="number" class="ent-tarifa-domfest" value="${cfg.tarifaDomFest ?? 0}" step="1000"></label>
         <label>Nocturno desde<input type="time" class="ent-noct-inicio" value="${(cfg.noctInicio || "19:00").slice(0,5)}"></label>
         <label>Nocturno hasta<input type="time" class="ent-noct-fin" value="${(cfg.noctFin || "07:00").slice(0,5)}"></label>
-      </div>`;
+      </div>
+      <p class="hint" style="margin:6px 0 0;">El sábado se factura como día de semana normal (ordinaria de día, nocturna en su franja). La tarifa de domingos/festivos aplica las 24 horas de ese día.</p>`;
   }
   return `<p class="hint" style="margin:0;">Sin parámetros adicionales — administra sus remitentes y tarifas en «Remitentes por agenda».</p>`;
 }
@@ -729,6 +732,7 @@ function collectEntidadConfigFromRow(tr, tipo){
     return {
       tarifaOrd: Number(tr.querySelector(".ent-tarifa-ord").value || 0),
       tarifaNoc: Number(tr.querySelector(".ent-tarifa-noc").value || 0),
+      tarifaDomFest: Number(tr.querySelector(".ent-tarifa-domfest").value || 0),
       noctInicio: tr.querySelector(".ent-noct-inicio").value,
       noctFin: tr.querySelector(".ent-noct-fin").value,
     };

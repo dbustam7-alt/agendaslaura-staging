@@ -5,7 +5,9 @@
    Sistema unificado: toda entidad (CES/AUNA/NOEL y cualquiera que se agregue) es una
    fila de la tabla `entidades` con un `tipo` que define cómo se valida y se factura:
      - franja_fija: bloque semanal fijo de horas (ej. CES). No factura, solo controla choques.
-     - por_hora:    tarifa por hora, ordinaria vs. nocturna/fin de semana (ej. AUNA).
+     - por_hora:    tarifa por hora, ordinaria vs. nocturna vs. domingos/festivos (ej. AUNA).
+                    El sábado se factura como día de semana normal (ordinaria de día,
+                    nocturna en su franja) — NO lleva la tarifa de domingo/festivo.
      - por_agenda:  turnos variables facturados por remitente/paciente (ej. NOEL). */
 
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -485,11 +487,64 @@ function turnoInterval(t){
 function overlaps(aStart, aEnd, bStart, bEnd){
   return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
 }
-function isWeekendDate(d){
-  const day = d.getDay(); // 0=Dom, 6=Sáb
-  return day === 0 || day === 6;
-}
 function minutesOfDay(d){ return d.getHours()*60 + d.getMinutes(); }
+
+// ---------- Festivos colombianos (Ley 51 de 1983 / Ley 1983 de 2005 "Emiliani") ----------
+// Domingo de resurrección (algoritmo gregoriano anónimo) — de ahí se derivan Jueves/Viernes
+// Santo (fijos, no se trasladan) y Ascensión/Corpus Christi/Sagrado Corazón (sí se trasladan).
+function domingoPascua(year){
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15)%30;
+  const i = Math.floor(c/4), k = c%4, l = (32+2*e+2*i-h-k)%7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const mes = Math.floor((h+l-7*m+114)/31); // 3=marzo, 4=abril
+  const dia = ((h+l-7*m+114)%31)+1;
+  return new Date(year, mes-1, dia);
+}
+function sumarDias(d, n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+// Ley Emiliani: si el festivo no cae en lunes, se traslada al lunes siguiente (si ya
+// cae en lunes, se queda igual — la fórmula da +0 días en ese caso).
+function trasladarALunes(d){ return sumarDias(d, (8 - d.getDay()) % 7); }
+const _festivosCache = {};
+function festivosColombia(year){
+  if (_festivosCache[year]) return _festivosCache[year];
+  const pascua = domingoPascua(year);
+  const fijos = [
+    new Date(year,0,1),    // Año nuevo
+    new Date(year,4,1),    // Día del trabajo
+    new Date(year,6,20),   // Independencia
+    new Date(year,7,7),    // Batalla de Boyacá
+    new Date(year,11,8),   // Inmaculada Concepción
+    new Date(year,11,25),  // Navidad
+    sumarDias(pascua,-3),  // Jueves Santo
+    sumarDias(pascua,-2),  // Viernes Santo
+  ];
+  const trasladables = [
+    new Date(year,0,6),    // Reyes Magos
+    new Date(year,2,19),   // San José
+    sumarDias(pascua,39),  // Ascensión del Señor
+    sumarDias(pascua,60),  // Corpus Christi
+    sumarDias(pascua,68),  // Sagrado Corazón
+    new Date(year,5,29),   // San Pedro y San Pablo
+    new Date(year,7,15),   // Asunción de la Virgen
+    new Date(year,9,12),   // Día de la Raza
+    new Date(year,10,1),   // Todos los Santos
+    new Date(year,10,11),  // Independencia de Cartagena
+  ].map(trasladarALunes);
+  const set = new Set([...fijos, ...trasladables].map(d=> getLocalDateISO(d)));
+  _festivosCache[year] = set;
+  return set;
+}
+function isFestivoColombia(d){
+  const iso = getLocalDateISO(d);
+  return festivosColombia(Number(iso.slice(0,4))).has(iso);
+}
+// Domingo o festivo colombiano: tarifa especial las 24 horas de ese día. El sábado
+// NO entra aquí — se factura como día de semana normal (ver computeHourlyBilling).
+function isDomingoOFestivo(d){
+  return d.getDay() === 0 || isFestivoColombia(d);
+}
 function fmtMoney(n){
   return "$" + Math.round(n).toLocaleString("es-CO");
 }
@@ -581,6 +636,7 @@ function computeHourlyBilling(start, end, cfg){
   const noctInicio = (cfg.noctInicio || "19:00").slice(0,5);
   const noctFin = (cfg.noctFin || "07:00").slice(0,5);
   const tarifaOrd = Number(cfg.tarifaOrd || 0), tarifaNoc = Number(cfg.tarifaNoc || 0);
+  const tarifaDomFest = Number(cfg.tarifaDomFest || 0);
 
   function isInNocturno(d){
     const [sh,sm] = noctInicio.split(":").map(Number);
@@ -590,10 +646,13 @@ function computeHourlyBilling(start, end, cfg){
     if (startMin > endMin) return cur >= startMin || cur < endMin; // cruza medianoche
     return cur >= startMin && cur < endMin;
   }
-  function tarifaEnInstante(d){
-    if (isWeekendDate(d)) return tarifaNoc;   // fin de semana completo
-    if (isInNocturno(d)) return tarifaNoc;    // nocturno entre semana
-    return tarifaOrd;                          // ordinario diurno
+  // Domingo/festivo: tarifa especial las 24 horas de ese día (no importa si es de día o de
+  // noche). El sábado ya NO es un caso especial: de día es ordinario, de noche es nocturno,
+  // igual que cualquier otro día de semana.
+  function categoriaEnInstante(d){
+    if (isDomingoOFestivo(d)) return "domFest";
+    if (isInNocturno(d)) return "noc";
+    return "ord";
   }
 
   const pts = new Set([start.getTime(), end.getTime()]);
@@ -608,17 +667,20 @@ function computeHourlyBilling(start, end, cfg){
     d.setDate(d.getDate()+1);
   }
   const sorted = [...pts].filter(t=>t>=start.getTime() && t<=end.getTime()).sort((a,b)=>a-b);
-  let ordMin=0, nocMin=0, subtotal=0;
+  let ordMin=0, nocMin=0, domFestMin=0, subtotal=0;
   for (let i=0;i<sorted.length-1;i++){
     const a=sorted[i], b=sorted[i+1];
     if (b<=a) continue;
     const mid = new Date((a+b)/2);
-    const rate = tarifaEnInstante(mid);
+    const cat = categoriaEnInstante(mid);
+    const rate = cat === "domFest" ? tarifaDomFest : cat === "noc" ? tarifaNoc : tarifaOrd;
     const minutes = (b-a)/60000;
-    if (rate === tarifaNoc) nocMin += minutes; else ordMin += minutes;
+    if (cat === "domFest") domFestMin += minutes;
+    else if (cat === "noc") nocMin += minutes;
+    else ordMin += minutes;
     subtotal += (minutes/60) * rate;
   }
-  return { ordMin, nocMin, subtotal };
+  return { ordMin, nocMin, domFestMin, subtotal };
 }
 
 // ---------- Cálculo genérico por turno, según el tipo de su entidad ----------
@@ -630,8 +692,8 @@ function calcularTurno(t){
 
   if (ent.tipo === "por_hora"){
     const b = computeHourlyBilling(start, end, ent.config);
-    const detalle = `${t.sede || ""} · ord ${fmtHours(b.ordMin/60)}h / noc-finde ${fmtHours(b.nocMin/60)}h`;
-    return { horas, subtotal: b.subtotal, detalle, ordMin: b.ordMin, nocMin: b.nocMin };
+    const detalle = `${t.sede || ""} · ord ${fmtHours(b.ordMin/60)}h / noc ${fmtHours(b.nocMin/60)}h / dom-fest ${fmtHours(b.domFestMin/60)}h`;
+    return { horas, subtotal: b.subtotal, detalle, ordMin: b.ordMin, nocMin: b.nocMin, domFestMin: b.domFestMin };
   }
   if (ent.tipo === "por_agenda"){
     const detalleLista = t.detalle || [];
