@@ -194,7 +194,7 @@ async function handleSavePrestador(){
     await savePrestadorDB(PRESTADOR);
     showAlert("Tus datos se guardaron.", "ok");
   }catch(e){
-    showAlert("Error guardando tus datos: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error guardando tus datos: " + e.message), "error");
   }
 }
 
@@ -232,7 +232,7 @@ async function handleSaveFacturacion(){
     FACTURACION = await fetchFacturacionAll();
     showAlert("Datos de facturación guardados.", "ok");
   }catch(e){
-    showAlert("Error guardando datos de facturación: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error guardando datos de facturación: " + e.message), "error");
   }
 }
 
@@ -419,7 +419,7 @@ async function handleGenerar(){
     showAlert(`Cuenta de cobro N° ${String(numero).padStart(3,"0")} generada.`, "ok");
     document.getElementById("invoice-wrap").scrollIntoView({behavior:"smooth", block:"start"});
   }catch(e){
-    showAlert("Error generando la cuenta de cobro: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error generando la cuenta de cobro: " + e.message), "error");
   }
 }
 
@@ -553,6 +553,9 @@ async function enterPage(){
   document.getElementById("needs-login").hidden = true;
   document.getElementById("cc-root").hidden = false;
   document.getElementById("cc-proyecto-nombre").textContent = activo.nombre;
+
+  await fetchSuscripcion();
+  renderSuscripcionBanner();
 
   ENTIDADES = await fetchEntidades();
   REMITENTES = await fetchRemitentes();

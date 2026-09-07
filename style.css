@@ -3,6 +3,7 @@
   --line:#e3e7ee; --primary:#2563eb; --primary-ink:#ffffff;
   --danger:#dc2626; --danger-bg:#fee2e2; --danger-line:#fca5a5;
   --ok:#16a34a; --ok-bg:#dcfce7;
+  --warning:#a16207; --warning-bg:#fef3c7; --warning-line:#fcd34d;
 }
 *{box-sizing:border-box;}
 [hidden]{display:none !important;}
@@ -75,6 +76,7 @@ input:focus,select:focus{outline:2px solid var(--primary); outline-offset:1px;}
 }
 .alert.error{background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-line);}
 .alert.ok{background:var(--ok-bg); color:var(--ok); border:1px solid #86efac;}
+.alert.warning{background:var(--warning-bg); color:var(--warning); border:1px solid var(--warning-line);}
 
 .table-wrap{overflow-x:auto;}
 table{width:100%; border-collapse:collapse; font-size:.85rem;}

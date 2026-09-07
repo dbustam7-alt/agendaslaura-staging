@@ -222,6 +222,57 @@ function isForeignKeyError(e){
   return !!e && (e.code === "23503" || /foreign key|violates.*constraint/i.test(e.message || ""));
 }
 
+// ---------- Suscripción (plan de pago) ----------
+// El bloqueo REAL de escritura cuando vence ya lo hace Postgres a nivel de RLS (ver
+// suscripcion_activa() en la base) — nunca solo en pantalla. Esto de aquí es solo
+// para AVISAR con tiempo y para traducir el error crudo de RLS a un mensaje claro;
+// la lectura de datos ya guardados NUNCA se bloquea, esté vencida o no.
+let SUSCRIPCION = null; // { estado, venceEl, plan } del proyecto activo, o null si no cargó
+async function fetchSuscripcion(){
+  const { data, error } = await sb.from("suscripciones").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).maybeSingle();
+  if (error || !data){ SUSCRIPCION = null; return null; }
+  SUSCRIPCION = { estado: data.estado, venceEl: data.vence_el, plan: data.plan };
+  return SUSCRIPCION;
+}
+function diasParaVencer(venceEl){
+  if (!venceEl) return null;
+  return Math.ceil((new Date(venceEl).getTime() - Date.now()) / 86400000);
+}
+// Código/mensaje típico de PostgREST cuando una escritura choca contra una policy
+// de Row Level Security (código 42501). Puede deberse a otras causas, pero en la
+// práctica, una vez pasado el login y la elección de proyecto, casi siempre es la
+// suscripción vencida — por eso mensajeSiSuscripcionVencida() da ese diagnóstico.
+function isRlsBlockedError(e){
+  return !!e && (e.code === "42501" || /row-level security|permission denied for/i.test(e.message || ""));
+}
+function mensajeSiSuscripcionVencida(e){
+  if (!isRlsBlockedError(e)) return null;
+  return "No se pudo guardar: el período de prueba/plan de este proyecto está vencido. Lo ya guardado se sigue viendo con normalidad — contáctanos para renovar y volver a registrar o editar información.";
+}
+// Aviso en el encabezado de cada página (index/cuenta-cobro/cierre-anual) — requiere
+// un <div id="suscripcion-banner" class="alert" hidden></div> en el HTML. Silencioso
+// si el plan está en orden; solo avisa si falta poco para vencer o si ya venció.
+function renderSuscripcionBanner(){
+  const box = document.getElementById("suscripcion-banner");
+  if (!box) return;
+  if (!SUSCRIPCION){ box.hidden = true; return; }
+  const dias = diasParaVencer(SUSCRIPCION.venceEl);
+  const vencida = SUSCRIPCION.estado === "vencida" || SUSCRIPCION.estado === "cancelada" || (dias !== null && dias <= 0);
+  if (vencida){
+    box.hidden = false;
+    box.className = "alert error";
+    box.textContent = "⛔ El período de prueba/plan de este proyecto venció: ya no se puede registrar ni editar información nueva. Lo ya guardado se sigue viendo con normalidad — contáctanos para renovar.";
+    return;
+  }
+  if (SUSCRIPCION.estado === "prueba" && dias !== null && dias <= 7){
+    box.hidden = false;
+    box.className = "alert warning";
+    box.textContent = `🕒 El período de prueba de este proyecto vence en ${dias} día${dias===1?"":"s"}. Después de esa fecha no se podrá registrar ni editar información nueva (lo ya guardado se sigue viendo).`;
+    return;
+  }
+  box.hidden = true;
+}
+
 // ---------- Remitentes (entidades tipo "por_agenda": EPS, aseguradoras, Particular, Póliza...) ----------
 async function fetchRemitentes(){
   const { data, error } = await sb.from("remitentes").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).eq("activo", true).order("orden");

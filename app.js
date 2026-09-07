@@ -164,6 +164,9 @@ async function enterApp(){
   const { data: { user } } = await sb.auth.getUser();
   document.getElementById("user-email-label").textContent = user ? user.email : "";
 
+  await fetchSuscripcion();
+  renderSuscripcionBanner();
+
   ENTIDADES = await fetchEntidades();
   REMITENTES = await fetchRemitentes();
   TURNOS = await fetchTurnos();
@@ -582,7 +585,7 @@ async function handleAddTurno(){
     }
     renderAll();
   }catch(e){
-    showAlert("Error guardando el turno: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error guardando el turno: " + e.message), "error");
   }
 }
 
@@ -745,7 +748,7 @@ async function saveEntidadesMaestro(){
     showAlert("Entidades guardadas.", "ok");
     renderAll();
   }catch(e){
-    showAlert("Error guardando entidades: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error guardando entidades: " + e.message), "error");
   }
 }
 async function handleDeleteEntidad(id){
@@ -764,6 +767,8 @@ async function handleDeleteEntidad(id){
   }catch(e){
     if (isForeignKeyError(e)){
       showAlert(`No se puede eliminar "${nombre}": todavía tiene turnos o remitentes asociados. Desactívala (destilda "Activa" y guarda) en vez de eliminarla.`, "error");
+    } else if (mensajeSiSuscripcionVencida(e)){
+      showAlert(mensajeSiSuscripcionVencida(e), "error");
     } else {
       showAlert(`Error eliminando "${nombre}": ` + e.message, "error");
     }
@@ -794,7 +799,7 @@ async function handleSaveDeducciones(){
     showAlert("Deducciones guardadas.", "ok");
     renderAll();
   }catch(e){
-    showAlert("Error guardando deducciones: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error guardando deducciones: " + e.message), "error");
   }
 }
 
@@ -851,7 +856,7 @@ async function saveRemitentesMaestro(){
     showAlert("Remitentes guardados.", "ok");
     renderAll();
   }catch(e){
-    showAlert("Error guardando remitentes: " + e.message, "error");
+    showAlert(mensajeSiSuscripcionVencida(e) || ("Error guardando remitentes: " + e.message), "error");
   }
 }
 

@@ -356,6 +356,9 @@ async function enterPage(){
   document.getElementById("ca-root").hidden = false;
   document.getElementById("ca-proyecto-nombre").textContent = activo.nombre;
 
+  await fetchSuscripcion();
+  renderSuscripcionBanner();
+
   ENTIDADES = await fetchEntidades();
   CUENTAS = await fetchCuentasCobro();
 
