@@ -25,16 +25,16 @@ function rowToPrestador(row){
     siguienteNumero: row.siguiente_numero, certificacionTributaria: row.certificacion_tributaria,
   };
 }
-// `prestador` ya no es una fila global fija (id=1): es una fila por usuario, aislada
-// por RLS (user_id = auth.uid()). Si es la primera vez que este usuario entra,
+// `prestador` es una fila por PROYECTO (todo el equipo del consultorio comparte los
+// mismos datos de facturación). Si es la primera vez que se usa este proyecto,
 // todavía no tiene fila propia — se crea aquí mismo con los valores por defecto de
 // la base de datos (nombre/identificación vacíos, próximo N° = 1, certificación
 // tributaria estándar), listos para que los complete en «Tus datos».
 async function fetchPrestador(){
-  const { data, error } = await sb.from("prestador").select("*").maybeSingle();
+  const { data, error } = await sb.from("prestador").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).maybeSingle();
   if (error){ showAlert("Error cargando tus datos: " + error.message, "error"); return null; }
   if (data) return rowToPrestador(data);
-  const { data: created, error: insErr } = await sb.from("prestador").insert({}).select().single();
+  const { data: created, error: insErr } = await sb.from("prestador").insert({ proyecto_id: PROYECTO_ACTUAL.id }).select().single();
   if (insErr){ showAlert("Error creando tus datos iniciales: " + insErr.message, "error"); return null; }
   return rowToPrestador(created);
 }
@@ -43,11 +43,11 @@ async function savePrestadorDB(p){
     nombre: p.nombre, identificacion: p.identificacion, direccion: p.direccion, ciudad: p.ciudad, telefono: p.telefono,
     banco: p.banco, tipo_cuenta: p.tipoCuenta, numero_cuenta: p.numeroCuenta,
     siguiente_numero: p.siguienteNumero, certificacion_tributaria: p.certificacionTributaria,
-  });
+  }).eq("proyecto_id", PROYECTO_ACTUAL.id);
   if (error) throw error;
 }
 async function bumpSiguienteNumero(n){
-  const { error } = await sb.from("prestador").update({ siguiente_numero: n });
+  const { error } = await sb.from("prestador").update({ siguiente_numero: n }).eq("proyecto_id", PROYECTO_ACTUAL.id);
   if (error) throw error;
 }
 
@@ -56,7 +56,7 @@ function rowToFacturacion(row){
   return { entidadId: row.entidad_id, razonSocial: row.razon_social, nit: row.nit, direccion: row.direccion, ciudad: row.ciudad, telefono: row.telefono };
 }
 async function fetchFacturacionAll(){
-  const { data, error } = await sb.from("entidad_facturacion").select("*");
+  const { data, error } = await sb.from("entidad_facturacion").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id);
   if (error){ showAlert("Error cargando datos de facturación: " + error.message, "error"); return {}; }
   const map = {};
   for (const row of data) map[row.entidad_id] = rowToFacturacion(row);
@@ -68,7 +68,7 @@ async function upsertFacturacionDB(entidadId, data){
     const { error } = await sb.from("entidad_facturacion").update(payload).eq("entidad_id", entidadId);
     if (error) throw error;
   } else {
-    const { error } = await sb.from("entidad_facturacion").insert(payload);
+    const { error } = await sb.from("entidad_facturacion").insert({ ...payload, proyecto_id: PROYECTO_ACTUAL.id });
     if (error) throw error;
   }
 }
@@ -537,12 +537,22 @@ async function handleDeleteCuenta(id){
 
 // ---------- Init ----------
 function showNeedsLogin(){
+  document.getElementById("needs-login-text").textContent = "Necesitas iniciar sesión primero en la app principal.";
+  document.getElementById("needs-login").hidden = false;
+  document.getElementById("cc-root").hidden = true;
+}
+function showNeedsProject(){
+  document.getElementById("needs-login-text").textContent = "Elige o crea tu proyecto primero en la app principal.";
   document.getElementById("needs-login").hidden = false;
   document.getElementById("cc-root").hidden = true;
 }
 async function enterPage(){
+  const { activo } = await resolverProyectoActivo();
+  if (!activo){ showNeedsProject(); return; }
+
   document.getElementById("needs-login").hidden = true;
   document.getElementById("cc-root").hidden = false;
+  document.getElementById("cc-proyecto-nombre").textContent = activo.nombre;
 
   ENTIDADES = await fetchEntidades();
   REMITENTES = await fetchRemitentes();

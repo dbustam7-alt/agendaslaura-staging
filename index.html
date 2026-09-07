@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🧪 Agenda Laura — PRUEBAS</title>
+<title>🧪 Consultorio Digital — PRUEBAS</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -17,7 +17,7 @@
 <!-- LOGIN / REGISTRO -->
 <div id="login-screen">
   <form id="login-form" class="login-card">
-    <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
+    <h1>🩺 Consultorio Digital 🧪 PRUEBAS</h1>
     <p class="subtitle">Inicia sesión para ver y registrar turnos</p>
     <div id="login-alert" class="alert" hidden></div>
     <label>Correo electrónico
@@ -27,12 +27,12 @@
       <input type="password" id="login-password" required autocomplete="current-password">
     </label>
     <button type="submit" id="btn-login" class="btn primary">Entrar</button>
-    <p class="login-note">Cada cuenta ve solo su propia información — nadie más ve tus turnos, entidades ni cuentas de cobro.</p>
+    <p class="login-note">Cada proyecto (consultorio) es independiente — solo las personas vinculadas a él ven sus turnos, entidades y cuentas de cobro.</p>
     <p class="login-switch">¿No tienes cuenta? <a href="#" id="link-show-signup">Crea una</a></p>
   </form>
 
   <form id="signup-form" class="login-card" hidden>
-    <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
+    <h1>🩺 Consultorio Digital 🧪 PRUEBAS</h1>
     <p class="subtitle">Crea tu cuenta</p>
     <div id="signup-alert" class="alert" hidden></div>
     <label>Correo electrónico
@@ -45,9 +45,47 @@
       <input type="password" id="signup-password-confirm" required autocomplete="new-password" minlength="6">
     </label>
     <button type="submit" id="btn-signup" class="btn primary">Crear cuenta</button>
-    <p class="login-note">Empiezas con tu propia agenda vacía: tus propias entidades, turnos y cuentas de cobro, separados de cualquier otra cuenta.</p>
+    <p class="login-note">Después de crear tu cuenta eliges: crear un proyecto nuevo (tu propio consultorio, vacío) o vincularte a uno existente con un código de invitación.</p>
     <p class="login-switch">¿Ya tienes cuenta? <a href="#" id="link-show-login">Inicia sesión</a></p>
   </form>
+</div>
+
+<!-- ELEGIR / CREAR / VINCULAR PROYECTO (consultorio) -->
+<div id="proyecto-screen" hidden>
+  <div class="login-card" style="width:min(460px,100%);">
+    <h1>🏢 Tu proyecto</h1>
+    <p class="subtitle">Un proyecto es tu consultorio — todas las personas vinculadas a él ven la misma agenda.</p>
+    <div id="proyecto-alert" class="alert" hidden></div>
+
+    <div id="proyecto-lista-wrap" hidden>
+      <label class="eps-label">Tus proyectos</label>
+      <div id="proyecto-lista" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;"></div>
+    </div>
+
+    <div id="proyecto-opciones" style="display:flex; flex-direction:column; gap:10px;">
+      <button type="button" id="btn-mostrar-crear-proyecto" class="btn secondary">➕ Crear proyecto nuevo</button>
+      <button type="button" id="btn-mostrar-vincular-proyecto" class="btn secondary">🔗 Vincularme con un código</button>
+    </div>
+
+    <form id="form-crear-proyecto" hidden style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+      <label>Nombre del proyecto (ej. «Consultorio Dra. Laura Jaramillo»)
+        <input type="text" id="nuevo-proyecto-nombre" required>
+      </label>
+      <button type="submit" class="btn primary">Crear proyecto</button>
+      <a href="#" class="link-volver-proyecto" style="text-align:center; font-size:.82rem;">← Volver</a>
+    </form>
+
+    <form id="form-vincular-proyecto" hidden style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+      <label>Código de invitación
+        <input type="text" id="codigo-invitacion" required placeholder="Ej. A1B2C3D4" style="text-transform:uppercase;">
+      </label>
+      <p class="hint" style="margin:0;">Pídeselo a quien administra el proyecto al que te quieres vincular (lo genera desde «⚙️ Entidades y tarifas → Personas con acceso»).</p>
+      <button type="submit" class="btn primary">Vincularme</button>
+      <a href="#" class="link-volver-proyecto" style="text-align:center; font-size:.82rem;">← Volver</a>
+    </form>
+
+    <p class="login-switch"><a href="#" id="link-logout-proyecto">Cerrar sesión</a></p>
+  </div>
 </div>
 
 <div id="app-root" hidden>
@@ -55,11 +93,12 @@
 <header>
   <div class="header-row">
     <div>
-      <h1>🩺 Agenda Laura 🧪 PRUEBAS</h1>
+      <h1>🩺 <span id="app-title">Agenda</span> 🧪 PRUEBAS</h1>
       <p class="subtitle">Asistente Clínico Operativo y Financiero</p>
     </div>
     <div class="header-actions">
       <span id="user-email-label" class="user-email"></span>
+      <button id="btn-cambiar-proyecto" class="btn secondary">🔁 Cambiar de proyecto</button>
       <a href="cuenta-cobro.html" target="_blank" class="btn secondary">🧾 Cuentas de cobro</a>
       <a href="cierre-anual.html" target="_blank" class="btn secondary">📊 Cierre anual</a>
       <button id="btn-open-settings" class="btn secondary">⚙️ Entidades y tarifas</button>
@@ -131,6 +170,22 @@
         </label>
       </div>
       <button type="button" id="btn-save-deducciones" class="btn primary">Guardar deducciones</button>
+    </div>
+
+    <div class="dlg-section">
+      <h3>👥 Personas con acceso</h3>
+      <p class="hint">Todas las personas vinculadas a este proyecto ven y editan la misma información (turnos, entidades, cuentas de cobro).</p>
+      <div class="table-wrap">
+        <table id="tbl-miembros">
+          <thead><tr><th>Correo</th><th>Rol</th></tr></thead>
+          <tbody id="miembros-rows"></tbody>
+        </table>
+      </div>
+      <div id="invitacion-wrap" style="margin-top:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;" hidden>
+        <button type="button" id="btn-generar-invitacion" class="btn secondary">Generar código de invitación</button>
+        <span id="invitacion-codigo" class="badge" style="--badge-color:#2563eb;" hidden></span>
+      </div>
+      <p class="hint" id="invitacion-hint" style="margin-top:6px;"></p>
     </div>
 
   </div>

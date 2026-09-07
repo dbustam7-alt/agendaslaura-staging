@@ -21,8 +21,8 @@ header h1{margin:0; font-size:1.5rem;}
 .header-row .btn.secondary:hover{background:rgba(255,255,255,.25);}
 .user-email{font-size:.8rem; opacity:.85;}
 
-/* ---------- login ---------- */
-#login-screen{
+/* ---------- login / elegir proyecto ---------- */
+#login-screen, #proyecto-screen{
   min-height:100vh; display:flex; align-items:center; justify-content:center;
   background:linear-gradient(135deg,#1e3a8a,#2563eb); padding:20px;
 }
@@ -37,6 +37,13 @@ header h1{margin:0; font-size:1.5rem;}
 .login-card .btn{width:100%; padding:11px;}
 .login-note{font-size:.74rem; color:var(--muted); text-align:center; margin:4px 0 0; font-weight:400;}
 .login-switch{font-size:.82rem; text-align:center; margin:10px 0 0;}
+.proyecto-item{
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding:12px 14px; border:1px solid var(--line); border-radius:10px; cursor:pointer; text-align:left;
+  background:none; font:inherit; width:100%;
+}
+.proyecto-item:hover{border-color:#2563eb; background:rgba(37,99,235,.06);}
+.proyecto-item .proyecto-rol{font-size:.72rem; color:var(--muted); text-transform:capitalize;}
 main{max-width:1100px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:18px;}
 .card{
   background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px;

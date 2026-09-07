@@ -16,6 +16,7 @@ const TIPO_ICON = { franja_fija:"🟣", por_hora:"🔵", por_agenda:"🟠" };
 let ENTIDADES = [];
 let REMITENTES = [];
 let TURNOS = [];
+let PROYECTO_ACTUAL = null; // { id, nombre, rol } — el consultorio/proyecto activo en esta sesión
 
 // ---------- Deducciones (trabajador independiente) ----------
 // Se aplican como % del valor bruto facturado por turno (solo entidades "por hora" y
@@ -63,6 +64,67 @@ const sb = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+// ---------- Proyectos (consultorios): varias personas por proyecto, varios proyectos por persona ----------
+// Cada persona puede pertenecer a más de un proyecto (ej. un contador con varios
+// consultorios) — por eso, a diferencia de las demás tablas, TODAS las consultas de
+// aquí en adelante filtran explícitamente por PROYECTO_ACTUAL.id: RLS solo garantiza
+// "eres miembro de ese proyecto", no "es el que tienes activo ahora mismo".
+const PROYECTO_STORAGE_KEY = "agendaLaura_proyectoId";
+function getProyectoGuardado(){
+  try{ return localStorage.getItem(PROYECTO_STORAGE_KEY); }catch(e){ return null; }
+}
+function setProyectoGuardado(id){
+  try{ localStorage.setItem(PROYECTO_STORAGE_KEY, id); }catch(e){ /* localStorage no disponible: no es crítico */ }
+}
+function limpiarProyectoGuardado(){
+  try{ localStorage.removeItem(PROYECTO_STORAGE_KEY); }catch(e){}
+}
+async function fetchMisProyectos(){
+  // OJO: la policy de "miembros_proyecto" es "ver los del proyecto donde soy
+  // miembro" (para poder ver a mis compañeros de equipo), no "ver solo mi propia
+  // fila" — así que aquí SÍ hace falta filtrar por user_id explícitamente, o
+  // devolvería también la fila de cada compañero en los proyectos compartidos.
+  const { data: { user } } = await sb.auth.getUser();
+  const { data, error } = await sb.from("miembros_proyecto").select("proyecto_id, rol, proyectos(nombre)").eq("user_id", user.id).order("created_at");
+  if (error){ showAlert("Error cargando tus proyectos: " + error.message, "error"); return []; }
+  return data.map(r => ({ id: r.proyecto_id, nombre: r.proyectos ? r.proyectos.nombre : "(proyecto eliminado)", rol: r.rol }));
+}
+async function crearProyecto(nombre){
+  const { data, error } = await sb.rpc("crear_proyecto", { p_nombre: nombre });
+  if (error) throw error;
+  return data; // uuid del proyecto nuevo
+}
+async function redimirInvitacion(codigo){
+  const { data, error } = await sb.rpc("redimir_invitacion", { p_codigo: codigo });
+  if (error) throw error;
+  return data; // uuid del proyecto al que quedó vinculada esta cuenta
+}
+async function generarInvitacion(proyectoId){
+  const { data, error } = await sb.rpc("generar_invitacion", { p_proyecto_id: proyectoId });
+  if (error) throw error;
+  return data; // código para compartir
+}
+async function fetchMiembrosProyecto(proyectoId){
+  const { data, error } = await sb.from("miembros_proyecto").select("*").eq("proyecto_id", proyectoId).order("created_at");
+  if (error){ showAlert("Error cargando las personas del proyecto: " + error.message, "error"); return []; }
+  return data.map(m => ({ userId: m.user_id, email: m.email, rol: m.rol }));
+}
+// Resuelve el proyecto activo de esta sesión: usa el guardado en localStorage si sigue
+// siendo válido, o lo autoselecciona si la persona pertenece a un solo proyecto.
+// `activo` queda null si hace falta que la persona elija/cree/se vincule a uno — el
+// selector completo vive en index.html; las otras páginas remiten ahí en ese caso.
+async function resolverProyectoActivo(){
+  const proyectos = await fetchMisProyectos();
+  const guardado = getProyectoGuardado();
+  let elegido = guardado ? proyectos.find(p => p.id === guardado) : null;
+  if (!elegido && proyectos.length === 1) elegido = proyectos[0];
+  if (elegido){
+    PROYECTO_ACTUAL = elegido;
+    setProyectoGuardado(elegido.id);
+  }
+  return { activo: elegido || null, lista: proyectos };
+}
+
 // ---------- Deducciones: persistencia ----------
 function rowToDeducciones(row){
   return {
@@ -82,20 +144,20 @@ function deduccionesToRow(d){
     retefuente_pct: d.retefuentePct,
   };
 }
-// `deducciones` (igual que `prestador`) ya no es una fila global fija (id=1): es una
-// fila por usuario, aislada por RLS (user_id = auth.uid()). Si es la primera vez que
-// este usuario entra, todavía no tiene fila propia — se crea aquí mismo con los
-// valores por defecto de la base de datos (que ya coinciden con DEFAULT_DEDUCCIONES).
+// `deducciones` es una fila por PROYECTO (no por persona: todo el equipo comparte los
+// mismos % de deducciones). Si es la primera vez que se usa este proyecto, todavía no
+// tiene fila propia — se crea aquí mismo con los valores por defecto de la base de
+// datos (que ya coinciden con DEFAULT_DEDUCCIONES).
 async function fetchDeducciones(){
-  const { data, error } = await sb.from("deducciones").select("*").maybeSingle();
+  const { data, error } = await sb.from("deducciones").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).maybeSingle();
   if (error){ showAlert("Error cargando deducciones: " + error.message, "error"); return {...DEFAULT_DEDUCCIONES}; }
   if (data) return rowToDeducciones(data);
-  const { data: created, error: insErr } = await sb.from("deducciones").insert({}).select().single();
+  const { data: created, error: insErr } = await sb.from("deducciones").insert({ proyecto_id: PROYECTO_ACTUAL.id }).select().single();
   if (insErr){ showAlert("Error creando tus deducciones iniciales: " + insErr.message, "error"); return {...DEFAULT_DEDUCCIONES}; }
   return rowToDeducciones(created);
 }
 async function saveDeduccionesDB(){
-  const { error } = await sb.from("deducciones").update(deduccionesToRow(DEDUCCIONES));
+  const { error } = await sb.from("deducciones").update(deduccionesToRow(DEDUCCIONES)).eq("proyecto_id", PROYECTO_ACTUAL.id);
   if (error) throw error;
 }
 
@@ -114,12 +176,12 @@ function rowToCuenta(row){
   };
 }
 async function fetchCuentasCobro(){
-  const { data, error } = await sb.from("cuentas_cobro").select("*").order("numero", { ascending:false });
+  const { data, error } = await sb.from("cuentas_cobro").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).order("numero", { ascending:false });
   if (error){ showAlert("Error cargando el historial: " + error.message, "error"); return []; }
   return data.map(rowToCuenta);
 }
 async function insertCuentaCobroDB(row){
-  const { error } = await sb.from("cuentas_cobro").insert(row);
+  const { error } = await sb.from("cuentas_cobro").insert({ ...row, proyecto_id: PROYECTO_ACTUAL.id });
   if (error) throw error;
 }
 async function deleteCuentaCobroDB(id){
@@ -136,12 +198,12 @@ function rowToEntidad(row){
   return { id: row.id, nombre: row.nombre, tipo: row.tipo, color: row.color, config: row.config || {}, orden: row.orden, activo: row.activo };
 }
 async function fetchEntidades(){
-  const { data, error } = await sb.from("entidades").select("*").order("orden");
+  const { data, error } = await sb.from("entidades").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).order("orden");
   if (error){ showAlert("Error cargando entidades: " + error.message, "error"); return []; }
   return data.map(rowToEntidad);
 }
 async function insertEntidadDB(e){
-  const { error } = await sb.from("entidades").insert({ nombre:e.nombre, tipo:e.tipo, color:e.color, config:e.config, orden:e.orden, activo:e.activo });
+  const { error } = await sb.from("entidades").insert({ nombre:e.nombre, tipo:e.tipo, color:e.color, config:e.config, orden:e.orden, activo:e.activo, proyecto_id: PROYECTO_ACTUAL.id });
   if (error) throw error;
 }
 async function updateEntidadDB(id, e){
@@ -162,13 +224,13 @@ function isForeignKeyError(e){
 
 // ---------- Remitentes (entidades tipo "por_agenda": EPS, aseguradoras, Particular, Póliza...) ----------
 async function fetchRemitentes(){
-  const { data, error } = await sb.from("remitentes").select("*").eq("activo", true).order("orden");
+  const { data, error } = await sb.from("remitentes").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).eq("activo", true).order("orden");
   if (error){ showAlert("Error cargando remitentes: " + error.message, "error"); return []; }
   return data.map(r => ({ id: r.id, nombre: r.nombre, tarifa: Number(r.tarifa), orden: r.orden, entidadId: r.entidad_id }));
 }
 async function insertRemitenteDB(entidadId, nombre, tarifa){
   const orden = remitentesDeEntidad(entidadId).length;
-  const { error } = await sb.from("remitentes").insert({ nombre, tarifa, orden, activo:true, entidad_id: entidadId });
+  const { error } = await sb.from("remitentes").insert({ nombre, tarifa, orden, activo:true, entidad_id: entidadId, proyecto_id: PROYECTO_ACTUAL.id });
   if (error) throw error;
 }
 async function updateRemitenteDB(id, nombre, tarifa){
@@ -209,6 +271,7 @@ function turnoToRow(t){
     inicio: t.inicio,
     fin: t.fin,
     sede: t.sede || null,
+    proyecto_id: PROYECTO_ACTUAL.id,
   };
 }
 async function saveDetalle(turnoId, detalle){
@@ -216,13 +279,14 @@ async function saveDetalle(turnoId, detalle){
     turno_id: turnoId, remitente_id: d.remitenteId, cantidad: d.cantidad,
     nombre_paciente: d.nombrePaciente || null,
     valor: d.tarifa != null ? d.tarifa : null,
+    proyecto_id: PROYECTO_ACTUAL.id,
   }));
   if (rows.length === 0) return;
   const { error } = await sb.from("turno_detalle").insert(rows);
   if (error) throw error;
 }
 async function fetchTurnos(){
-  const { data, error } = await sb.from("turnos").select(TURNO_SELECT).order("fecha").order("inicio");
+  const { data, error } = await sb.from("turnos").select(TURNO_SELECT).eq("proyecto_id", PROYECTO_ACTUAL.id).order("fecha").order("inicio");
   if (error){ showAlert("Error cargando turnos: " + error.message, "error"); return []; }
   return data.map(rowToTurno);
 }

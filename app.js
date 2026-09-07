@@ -15,6 +15,7 @@ function showLoginAlert(msg, type){
 }
 function showLoginScreen(){
   document.getElementById("app-root").hidden = true;
+  document.getElementById("proyecto-screen").hidden = true;
   document.getElementById("login-screen").hidden = false;
   document.getElementById("login-password").value = "";
   showLoginForm(); // al volver a la pantalla de acceso (ej. tras salir), siempre arranca en login, no en registro
@@ -33,9 +34,132 @@ function showSignupAlert(msg, type){
   box.className = "alert " + type;
   box.textContent = (type === "error" ? "⚠️ " : "✅ ") + msg;
 }
+// ---------- Proyecto (consultorio): elegir, crear, vincularse ----------
+function showProyectoScreen(){
+  document.getElementById("login-screen").hidden = true;
+  document.getElementById("app-root").hidden = true;
+  document.getElementById("proyecto-screen").hidden = false;
+  mostrarOpcionesProyecto();
+}
+function showProyectoAlert(msg, type){
+  const box = document.getElementById("proyecto-alert");
+  box.hidden = false;
+  box.className = "alert " + type;
+  box.textContent = (type === "error" ? "⚠️ " : "✅ ") + msg;
+}
+function mostrarOpcionesProyecto(){
+  document.getElementById("proyecto-opciones").hidden = false;
+  document.getElementById("form-crear-proyecto").hidden = true;
+  document.getElementById("form-vincular-proyecto").hidden = true;
+}
+function mostrarFormCrearProyecto(){
+  document.getElementById("proyecto-opciones").hidden = true;
+  document.getElementById("form-crear-proyecto").hidden = false;
+  document.getElementById("form-vincular-proyecto").hidden = true;
+}
+function mostrarFormVincularProyecto(){
+  document.getElementById("proyecto-opciones").hidden = true;
+  document.getElementById("form-crear-proyecto").hidden = true;
+  document.getElementById("form-vincular-proyecto").hidden = false;
+}
+function renderProyectoLista(lista){
+  const wrap = document.getElementById("proyecto-lista-wrap");
+  const cont = document.getElementById("proyecto-lista");
+  if (!lista.length){ wrap.hidden = true; cont.innerHTML = ""; return; }
+  wrap.hidden = false;
+  cont.innerHTML = lista.map(p => `
+    <button type="button" class="proyecto-item" data-proyecto="${p.id}">
+      <span>${esc(p.nombre)}</span>
+      <span class="proyecto-rol">${esc(p.rol)}</span>
+    </button>
+  `).join("");
+  cont.querySelectorAll("[data-proyecto]").forEach(btn=>{
+    btn.addEventListener("click", ()=> entrarAProyecto(lista.find(p=>p.id===btn.dataset.proyecto)));
+  });
+}
+async function entrarAProyecto(proyecto){
+  PROYECTO_ACTUAL = proyecto;
+  setProyectoGuardado(proyecto.id);
+  document.getElementById("proyecto-screen").hidden = true;
+  await enterApp();
+}
+// Punto de entrada tras confirmar sesión: resuelve el proyecto activo solo (si ya
+// tiene uno guardado o pertenece a exactamente uno) o pide elegir/crear/vincularse.
+async function handleAuthenticated(){
+  document.getElementById("login-screen").hidden = true;
+  const { activo, lista } = await resolverProyectoActivo();
+  if (activo){
+    document.getElementById("proyecto-screen").hidden = true;
+    await enterApp();
+    return;
+  }
+  showProyectoScreen();
+  renderProyectoLista(lista);
+}
+async function handleCrearProyecto(e){
+  e.preventDefault();
+  const nombre = document.getElementById("nuevo-proyecto-nombre").value.trim();
+  if (!nombre) return;
+  const btn = e.target.querySelector("button[type=submit]");
+  btn.disabled = true;
+  try{
+    const id = await crearProyecto(nombre);
+    await entrarAProyecto({ id, nombre, rol: "dueño" });
+  }catch(err){
+    showProyectoAlert("Error creando el proyecto: " + err.message, "error");
+  }finally{
+    btn.disabled = false;
+  }
+}
+async function handleVincularProyecto(e){
+  e.preventDefault();
+  const codigo = document.getElementById("codigo-invitacion").value.trim();
+  if (!codigo) return;
+  const btn = e.target.querySelector("button[type=submit]");
+  btn.disabled = true;
+  try{
+    const proyectoId = await redimirInvitacion(codigo);
+    const lista = await fetchMisProyectos();
+    const proyecto = lista.find(p=>p.id===proyectoId) || { id: proyectoId, nombre: "Proyecto vinculado", rol: "miembro" };
+    await entrarAProyecto(proyecto);
+  }catch(err){
+    showProyectoAlert("No se pudo vincular: " + err.message, "error");
+  }finally{
+    btn.disabled = false;
+  }
+}
+function handleCambiarProyecto(){
+  document.getElementById("app-root").hidden = true;
+  showProyectoScreen();
+  fetchMisProyectos().then(renderProyectoLista);
+}
+
+// ---------- Personas con acceso al proyecto ----------
+async function renderMiembros(){
+  const miembros = await fetchMiembrosProyecto(PROYECTO_ACTUAL.id);
+  document.getElementById("miembros-rows").innerHTML = miembros.map(m=>`
+    <tr><td>${esc(m.email)}</td><td style="text-transform:capitalize;">${esc(m.rol)}</td></tr>
+  `).join("");
+  document.getElementById("invitacion-wrap").hidden = false;
+  document.getElementById("invitacion-codigo").hidden = true;
+  document.getElementById("invitacion-hint").textContent = "";
+}
+async function handleGenerarInvitacion(){
+  try{
+    const codigo = await generarInvitacion(PROYECTO_ACTUAL.id);
+    const span = document.getElementById("invitacion-codigo");
+    span.hidden = false;
+    span.textContent = codigo;
+    document.getElementById("invitacion-hint").textContent = "Comparte este código con quien quieras invitar — lo ingresa en «Vincularme con un código» al crear su cuenta. Se puede usar una sola vez.";
+  }catch(err){
+    showAlert("Error generando la invitación: " + err.message, "error");
+  }
+}
+
 async function enterApp(){
   document.getElementById("login-screen").hidden = true;
   document.getElementById("app-root").hidden = false;
+  document.getElementById("app-title").textContent = PROYECTO_ACTUAL.nombre;
 
   const { data: { user } } = await sb.auth.getUser();
   document.getElementById("user-email-label").textContent = user ? user.email : "";
@@ -70,6 +194,8 @@ async function handleLogin(e){
 }
 async function handleLogout(){
   await sb.auth.signOut();
+  PROYECTO_ACTUAL = null;
+  limpiarProyectoGuardado(); // así la próxima persona que use este navegador no hereda el proyecto de la anterior
 }
 // El registro crea una cuenta de Supabase Auth nueva; el aislamiento de datos por
 // dueño (RLS + user_id) ya está en la base — con solo iniciar sesión, esa persona
@@ -1072,8 +1198,19 @@ document.addEventListener("DOMContentLoaded", ()=>{
   document.getElementById("link-show-login").addEventListener("click", (e)=>{ e.preventDefault(); showLoginForm(); });
   document.getElementById("btn-logout").addEventListener("click", handleLogout);
   sb.auth.onAuthStateChange((event, session)=>{
-    if (session) enterApp(); else showLoginScreen();
+    if (session) handleAuthenticated(); else showLoginScreen();
   });
+
+  document.getElementById("form-crear-proyecto").addEventListener("submit", handleCrearProyecto);
+  document.getElementById("form-vincular-proyecto").addEventListener("submit", handleVincularProyecto);
+  document.getElementById("btn-mostrar-crear-proyecto").addEventListener("click", mostrarFormCrearProyecto);
+  document.getElementById("btn-mostrar-vincular-proyecto").addEventListener("click", mostrarFormVincularProyecto);
+  document.querySelectorAll(".link-volver-proyecto").forEach(a=>{
+    a.addEventListener("click", (e)=>{ e.preventDefault(); mostrarOpcionesProyecto(); });
+  });
+  document.getElementById("btn-cambiar-proyecto").addEventListener("click", handleCambiarProyecto);
+  document.getElementById("link-logout-proyecto").addEventListener("click", (e)=>{ e.preventDefault(); handleLogout(); });
+  document.getElementById("btn-generar-invitacion").addEventListener("click", handleGenerarInvitacion);
 
   document.getElementById("f-entidad").addEventListener("change", ()=>{
     toggleFormFields();
@@ -1082,7 +1219,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   });
 
   const dlgSettings = document.getElementById("dlg-settings");
-  document.getElementById("btn-open-settings").addEventListener("click", ()=> dlgSettings.showModal());
+  document.getElementById("btn-open-settings").addEventListener("click", ()=>{ dlgSettings.showModal(); renderMiembros(); });
   document.getElementById("btn-close-settings").addEventListener("click", ()=> dlgSettings.close());
   dlgSettings.addEventListener("click", (e)=>{ if (e.target === dlgSettings) dlgSettings.close(); });
 

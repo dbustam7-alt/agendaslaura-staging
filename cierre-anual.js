@@ -339,12 +339,22 @@ function handleCalcular(){
 
 // ---------- Init ----------
 function showNeedsLogin(){
+  document.getElementById("needs-login-text").textContent = "Necesitas iniciar sesión primero en la app principal.";
+  document.getElementById("needs-login").hidden = false;
+  document.getElementById("ca-root").hidden = true;
+}
+function showNeedsProject(){
+  document.getElementById("needs-login-text").textContent = "Elige o crea tu proyecto primero en la app principal.";
   document.getElementById("needs-login").hidden = false;
   document.getElementById("ca-root").hidden = true;
 }
 async function enterPage(){
+  const { activo } = await resolverProyectoActivo();
+  if (!activo){ showNeedsProject(); return; }
+
   document.getElementById("needs-login").hidden = true;
   document.getElementById("ca-root").hidden = false;
+  document.getElementById("ca-proyecto-nombre").textContent = activo.nombre;
 
   ENTIDADES = await fetchEntidades();
   CUENTAS = await fetchCuentasCobro();
