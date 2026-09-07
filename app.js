@@ -138,6 +138,10 @@ function renderAgenda(){
     const color = ent ? ent.color : "#94a3b8";
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td style="white-space:nowrap;">
+        <button class="btn secondary btn-sm" data-edit="${t.id}">Editar</button>
+        <button class="btn danger-link" data-del="${t.id}">Eliminar</button>
+      </td>
       <td>${t.fecha}</td>
       <td>${DIAS[d.getDay()]}</td>
       <td><span class="badge" style="--badge-color:${color}">${esc(nombre)}</span></td>
@@ -146,10 +150,6 @@ function renderAgenda(){
       <td>${fmtHours(calc.horas)}</td>
       <td>${esc(calc.detalle)}</td>
       <td>${calc.subtotal ? fmtMoney(calc.subtotal) : "—"}</td>
-      <td style="white-space:nowrap;">
-        <button class="btn secondary btn-sm" data-edit="${t.id}">Editar</button>
-        <button class="btn danger-link" data-del="${t.id}">Eliminar</button>
-      </td>
     `;
     tbody.appendChild(tr);
   }
