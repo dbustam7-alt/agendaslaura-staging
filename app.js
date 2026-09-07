@@ -173,6 +173,23 @@ async function renderMiembros(){
   document.getElementById("invitacion-codigo").hidden = true;
   document.getElementById("invitacion-hint").textContent = "";
 }
+async function renderAuditoria(){
+  const [filas, miembros] = await Promise.all([ fetchAuditoria(100), fetchMiembrosProyecto(PROYECTO_ACTUAL.id) ]);
+  const emailPorUid = {};
+  for (const m of miembros) emailPorUid[m.userId] = m.email;
+  const tbody = document.getElementById("auditoria-rows");
+  if (!filas.length){
+    tbody.innerHTML = `<tr><td colspan="5" class="hint">Todavía no hay cambios registrados.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filas.map(row => {
+    const fecha = new Date(row.creado_el).toLocaleString("es-CO", { dateStyle:"short", timeStyle:"short" });
+    const quien = row.user_id ? (emailPorUid[row.user_id] || "(persona ya no vinculada)") : "—";
+    const accion = AUDITORIA_OPERACION_LABEL[row.operacion] || row.operacion;
+    const tabla = AUDITORIA_TABLA_LABEL[row.tabla] || row.tabla;
+    return `<tr><td>${esc(fecha)}</td><td>${esc(quien)}</td><td>${esc(accion)}</td><td>${esc(tabla)}</td><td>${esc(resumenAuditoria(row))}</td></tr>`;
+  }).join("");
+}
 async function handleGenerarInvitacion(){
   try{
     const codigo = await generarInvitacion(PROYECTO_ACTUAL.id);
@@ -1256,7 +1273,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   });
 
   const dlgSettings = document.getElementById("dlg-settings");
-  document.getElementById("btn-open-settings").addEventListener("click", ()=>{ dlgSettings.showModal(); renderMiembros(); });
+  document.getElementById("btn-open-settings").addEventListener("click", ()=>{ dlgSettings.showModal(); renderMiembros(); renderAuditoria(); });
   document.getElementById("btn-close-settings").addEventListener("click", ()=> dlgSettings.close());
   dlgSettings.addEventListener("click", (e)=>{ if (e.target === dlgSettings) dlgSettings.close(); });
 

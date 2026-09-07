@@ -295,6 +295,38 @@ async function registrarConsentimiento(){
   if (error) throw error;
 }
 
+// ---------- Auditoría: quién hizo qué cambio y cuándo ----------
+// Solo lectura desde el cliente — la única forma de escribir en `auditoria` es el
+// trigger de la base de datos (fn_auditoria) sobre cada tabla operativa, nunca la
+// app. Por eso no hay ninguna función de "insertar auditoría" aquí: ese camino no
+// existe, ni siquiera para nosotros.
+const AUDITORIA_TABLA_LABEL = {
+  entidades:'Entidad', remitentes:'Remitente', turnos:'Turno', turno_detalle:'Detalle de turno',
+  deducciones:'Deducciones', prestador:'Tus datos (prestador)', entidad_facturacion:'Datos de facturación',
+  cuentas_cobro:'Cuenta de cobro',
+};
+const AUDITORIA_OPERACION_LABEL = { INSERT:'Creó', UPDATE:'Editó', DELETE:'Eliminó' };
+async function fetchAuditoria(limite){
+  const { data, error } = await sb.from("auditoria").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).order("creado_el", { ascending:false }).limit(limite || 100);
+  if (error){ showAlert("Error cargando el historial de cambios: " + error.message, "error"); return []; }
+  return data;
+}
+// Un detalle corto e identificable del registro afectado, según la tabla — solo
+// para que el historial sea legible de un vistazo, no un resumen exhaustivo.
+function resumenAuditoria(row){
+  const d = row.datos_nuevos || row.datos_anteriores || {};
+  switch (row.tabla){
+    case 'entidades': return d.nombre || '';
+    case 'remitentes': return d.nombre || '';
+    case 'turnos': return d.fecha ? `${d.fecha} ${(d.inicio||'').slice(0,5)}–${(d.fin||'').slice(0,5)}` : '';
+    case 'cuentas_cobro': return d.numero != null ? `N° ${String(d.numero).padStart(3,'0')}` : '';
+    case 'prestador': return d.nombre || '';
+    case 'entidad_facturacion': return d.razon_social || '';
+    case 'turno_detalle': return d.nombre_paciente || '';
+    default: return '';
+  }
+}
+
 // ---------- Remitentes (entidades tipo "por_agenda": EPS, aseguradoras, Particular, Póliza...) ----------
 async function fetchRemitentes(){
   const { data, error } = await sb.from("remitentes").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).eq("activo", true).order("orden");
