@@ -359,7 +359,10 @@ function renderEntidadFormOptions(){
   if (ent && ent.tipo === "por_agenda") resetAgendaFormRows();
 }
 
-// ---------- Filas dinámicas de remitentes (entidades "por agenda") ----------
+// ---------- Filas dinámicas de pacientes (entidades "por agenda") ----------
+// Cada fila es un paciente: remitente (EPS/aseguradora/etc.), su nombre, y un valor
+// que se precarga con la tarifa del remitente pero se puede editar — el precio real
+// puede variar de un paciente a otro aunque compartan remitente.
 function addAgendaFormRow(){
   const ent = currentFormEntidad();
   const opciones = ent ? remitentesDeEntidad(ent.id) : [];
@@ -367,10 +370,19 @@ function addAgendaFormRow(){
   const row = document.createElement("div");
   row.className = "eps-row";
   row.innerHTML = `
-    <select class="f-agenda-remitente">${opciones.map(r=>`<option value="${r.id}">${esc(r.nombre)}</option>`).join("")}</select>
-    <input type="number" class="f-agenda-cantidad" min="0" value="0" placeholder="Cant.">
-    <button type="button" class="btn ghost-icon eps-row-remove" aria-label="Quitar remitente">✕</button>
+    <input type="text" class="f-agenda-nombre-paciente" placeholder="Nombre del paciente">
+    <select class="f-agenda-remitente">${opciones.map(r=>`<option value="${r.id}" data-tarifa="${r.tarifa}">${esc(r.nombre)}</option>`).join("")}</select>
+    <input type="number" class="f-agenda-valor" min="0" step="1000" placeholder="Valor">
+    <button type="button" class="btn ghost-icon eps-row-remove" aria-label="Quitar paciente">✕</button>
   `;
+  const selRem = row.querySelector(".f-agenda-remitente");
+  const inpValor = row.querySelector(".f-agenda-valor");
+  function aplicarValorPorDefecto(){
+    const opt = selRem.options[selRem.selectedIndex];
+    inpValor.value = opt ? opt.dataset.tarifa : 0;
+  }
+  aplicarValorPorDefecto(); // trae el valor por defecto del remitente ya seleccionado
+  selRem.addEventListener("change", aplicarValorPorDefecto); // al cambiar de remitente, sugiere su valor (se puede volver a editar)
   row.querySelector(".eps-row-remove").addEventListener("click", ()=> row.remove());
   wrap.appendChild(row);
   return row;
@@ -382,17 +394,27 @@ function resetAgendaFormRows(){
 function collectAgendaFormRows(){
   return Array.from(document.querySelectorAll("#f-agenda-rows .eps-row")).map(row=>{
     const remitenteId = row.querySelector(".f-agenda-remitente").value;
-    const cantidad = Number(row.querySelector(".f-agenda-cantidad").value || 0);
+    const nombrePaciente = row.querySelector(".f-agenda-nombre-paciente").value.trim();
+    const valor = Number(row.querySelector(".f-agenda-valor").value || 0);
+    const cantidadLegado = Number(row.dataset.legacyCantidad || 0);
     const rem = REMITENTES.find(r=>r.id === remitenteId);
-    return { remitenteId, nombre: rem ? rem.nombre : "", tarifa: rem ? rem.tarifa : 0, cantidad };
-  }).filter(d=>d.cantidad > 0);
+    if (nombrePaciente){
+      return { remitenteId, nombre: rem ? rem.nombre : "", tarifa: valor, cantidad: 1, nombrePaciente };
+    }
+    if (cantidadLegado > 0){
+      // Fila de un turno registrado antes de pedir nombre de paciente: se conserva
+      // agrupada por remitente tal cual estaba, sin inventar un nombre que no existe.
+      return { remitenteId, nombre: rem ? rem.nombre : "", tarifa: valor, cantidad: cantidadLegado, nombrePaciente: null };
+    }
+    return null; // fila vacía sin usar (ej. el turno se registra sin detalle todavía)
+  }).filter(Boolean);
 }
 function renderAgendaFormOptions(){
   const ent = currentFormEntidad();
   const opciones = ent ? remitentesDeEntidad(ent.id) : [];
   document.querySelectorAll(".f-agenda-remitente").forEach(sel=>{
     const cur = sel.value;
-    sel.innerHTML = opciones.map(r=>`<option value="${r.id}">${esc(r.nombre)}</option>`).join("");
+    sel.innerHTML = opciones.map(r=>`<option value="${r.id}" data-tarifa="${r.tarifa}">${esc(r.nombre)}</option>`).join("");
     if (opciones.some(o=>o.id===cur)) sel.value = cur;
   });
 }
@@ -464,7 +486,14 @@ function startEditTurno(id){
       const row = addAgendaFormRow();
       if (d){
         row.querySelector(".f-agenda-remitente").value = d.remitenteId;
-        row.querySelector(".f-agenda-cantidad").value = d.cantidad;
+        row.querySelector(".f-agenda-valor").value = d.tarifa;
+        if (d.nombrePaciente){
+          row.querySelector(".f-agenda-nombre-paciente").value = d.nombrePaciente;
+        } else {
+          // Fila de antes de pedir nombre de paciente: se conserva su cantidad agrupada
+          // (oculta) para no perderla si el usuario guarda sin tocar el detalle.
+          row.dataset.legacyCantidad = d.cantidad;
+        }
       }
     }
   }

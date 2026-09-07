@@ -129,24 +129,39 @@ function buildLineasPorHora(turnos, etiqueta){
     return { cantidad: horas, cantidadTexto: fmtHours(horas), concepto, valorUnit, total: calc.subtotal, fecha: t.fecha, entidadId: t.entidadId, entidadNombre: etiqueta || getEntidad(t.entidadId)?.nombre };
   });
 }
+// Las líneas CON nombre de paciente van una por una en la cuenta de cobro (el valor
+// puede variar de un paciente a otro, así que agruparlas por remitente mostraría un
+// "valor unitario" engañoso). Las líneas de antes de pedir nombre de paciente (sin
+// nombre, agrupadas por remitente) se siguen sumando juntas, como siempre.
 function buildLineasPorAgenda(turnos, etiqueta){
   const porRemitente = {};
+  const porPaciente = [];
   let entidadId = null;
   for (const t of turnos){
     entidadId = t.entidadId;
     const calc = calcularTurno(t);
     for (const d of (calc.detalleLista || [])){
-      const cur = porRemitente[d.nombre] || { cantidad:0, total:0, tarifa:d.tarifa };
-      cur.cantidad += d.cantidad; cur.total += d.cantidad * d.tarifa;
-      porRemitente[d.nombre] = cur;
+      if (d.nombrePaciente){
+        porPaciente.push({ nombrePaciente: d.nombrePaciente, remitente: d.nombre, valor: d.tarifa, fecha: t.fecha });
+      } else {
+        const cur = porRemitente[d.nombre] || { cantidad:0, total:0, tarifa:d.tarifa };
+        cur.cantidad += d.cantidad; cur.total += d.cantidad * d.tarifa;
+        porRemitente[d.nombre] = cur;
+      }
     }
   }
   const entidadNombre = etiqueta || (entidadId ? getEntidad(entidadId)?.nombre : null);
-  return Object.entries(porRemitente).map(([nombre, v])=>({
+  const lineasAgrupadas = Object.entries(porRemitente).map(([nombre, v])=>({
     cantidad: v.cantidad, cantidadTexto: String(v.cantidad),
     concepto: `Consulta ${nombre}${etiqueta ? " — " + etiqueta : ""}`,
     valorUnit: v.tarifa, total: v.total, fecha: null, entidadId, entidadNombre,
   }));
+  const lineasPaciente = porPaciente.map(p=>({
+    cantidad: 1, cantidadTexto: "1",
+    concepto: `Consulta ${p.remitente} — ${p.nombrePaciente}${etiqueta ? " — " + etiqueta : ""}`,
+    valorUnit: p.valor, total: p.valor, fecha: p.fecha, entidadId, entidadNombre,
+  }));
+  return lineasAgrupadas.concat(lineasPaciente);
 }
 
 // ---------- UI: datos del prestador ----------

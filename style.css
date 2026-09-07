@@ -196,7 +196,7 @@ dialog.dialog-wide{width:min(760px,94vw);}
 /* ---------- remitentes por agenda ---------- */
 .eps-label{display:block; margin:2px 0 6px;}
 #f-agenda-rows{display:flex; flex-direction:column; gap:8px; margin-bottom:10px;}
-.eps-row{display:grid; grid-template-columns:1fr 90px auto; gap:8px; align-items:center;}
+.eps-row{display:grid; grid-template-columns:1.3fr 1fr 110px auto; gap:8px; align-items:center;}
 .eps-row select{min-width:0;}
 .btn-sm{padding:6px 12px; font-size:.78rem;}
 .btn.ghost-icon{

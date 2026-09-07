@@ -177,7 +177,7 @@ async function updateRemitenteDB(id, nombre, tarifa){
 }
 
 // ---------- Turnos ----------
-const TURNO_SELECT = "*, turno_detalle(cantidad, remitente_id, remitentes(nombre, tarifa))";
+const TURNO_SELECT = "*, turno_detalle(cantidad, remitente_id, nombre_paciente, valor, remitentes(nombre, tarifa))";
 
 function rowToTurno(row){
   const detalle = (row.turno_detalle || [])
@@ -185,8 +185,12 @@ function rowToTurno(row){
     .map(d => ({
       remitenteId: d.remitente_id,
       nombre: d.remitentes ? d.remitentes.nombre : "(remitente eliminado)",
-      tarifa: d.remitentes ? Number(d.remitentes.tarifa) : 0,
+      // El valor propio de esta línea manda (se captura por paciente, editable); si es
+      // una línea de antes de pedir nombre de paciente (valor=NULL), usa la tarifa
+      // vigente del remitente, como siempre se hizo.
+      tarifa: d.valor != null ? Number(d.valor) : (d.remitentes ? Number(d.remitentes.tarifa) : 0),
       cantidad: d.cantidad,
+      nombrePaciente: d.nombre_paciente || null,
     }));
   return {
     id: row.id,
@@ -210,6 +214,8 @@ function turnoToRow(t){
 async function saveDetalle(turnoId, detalle){
   const rows = (detalle || []).filter(d => d.cantidad > 0 && d.remitenteId).map(d => ({
     turno_id: turnoId, remitente_id: d.remitenteId, cantidad: d.cantidad,
+    nombre_paciente: d.nombrePaciente || null,
+    valor: d.tarifa != null ? d.tarifa : null,
   }));
   if (rows.length === 0) return;
   const { error } = await sb.from("turno_detalle").insert(rows);
@@ -431,7 +437,9 @@ function calcularTurno(t){
     const detalleLista = t.detalle || [];
     const total = detalleLista.reduce((s,d)=> s + d.cantidad, 0);
     const subtotal = detalleLista.reduce((s,d)=> s + d.cantidad*d.tarifa, 0);
-    const resumen = detalleLista.length ? detalleLista.map(d => `${d.nombre} (${d.cantidad})`).join(", ") : "—";
+    const resumen = detalleLista.length
+      ? detalleLista.map(d => d.nombrePaciente ? `${d.nombrePaciente} (${d.nombre}, ${fmtMoney(d.tarifa)})` : `${d.nombre} (${d.cantidad})`).join(", ")
+      : "—";
     return { horas, subtotal, detalle: `${total} pac./visitas: ${resumen}`, detalleLista, total };
   }
   // franja_fija
