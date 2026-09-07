@@ -273,6 +273,28 @@ function renderSuscripcionBanner(){
   box.hidden = true;
 }
 
+// ---------- Consentimiento legal (Habeas Data — Ley 1581 de 2012) ----------
+// Registro de que la persona aceptó explícitamente la política de tratamiento de
+// datos y los términos de uso (ver legal.html). Es POR CUENTA (auth.users), no por
+// proyecto: da igual a cuántos consultorios pertenezca, solo debe aceptar una vez
+// por versión vigente. Sube LEGAL_VERSION cuando cambie el texto de legal.html para
+// forzar una nueva aceptación en el próximo inicio de sesión de todo el mundo.
+const LEGAL_VERSION = "2026-09-07";
+async function tieneConsentimientoVigente(){
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return false;
+  const { data, error } = await sb.from("consentimientos_legales").select("id").eq("user_id", user.id).eq("version", LEGAL_VERSION).maybeSingle();
+  // Si falla la consulta (ej. sin conexión momentánea) no bloqueamos por eso — no es
+  // este el mecanismo de bloqueo real de datos, solo el de pedir la aceptación.
+  if (error) return true;
+  return !!data;
+}
+async function registrarConsentimiento(){
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from("consentimientos_legales").insert({ user_id: user.id, version: LEGAL_VERSION });
+  if (error) throw error;
+}
+
 // ---------- Remitentes (entidades tipo "por_agenda": EPS, aseguradoras, Particular, Póliza...) ----------
 async function fetchRemitentes(){
   const { data, error } = await sb.from("remitentes").select("*").eq("proyecto_id", PROYECTO_ACTUAL.id).eq("activo", true).order("orden");

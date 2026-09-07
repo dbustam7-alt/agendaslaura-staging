@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔒 Política de privacidad y términos — PRUEBAS</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .legal-nav{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+  .legal-nav a{ font-size:.82rem; }
+  .legal main{ max-width:820px; }
+  .legal h2{ margin-top:0; }
+  .legal h3{ font-size:.95rem; margin:18px 0 6px; }
+  .legal p, .legal li{ font-size:.88rem; line-height:1.6; color:var(--ink); }
+  .legal ul{ padding-left:22px; margin:8px 0; }
+  .legal .placeholder{ background:#fff3cd; padding:1px 4px; border-radius:4px; font-weight:600; }
+  .legal .fecha{ color:var(--muted); font-size:.8rem; }
+</style>
+</head>
+<body class="legal">
+
+<div style="background:#b91c1c; color:#fff; text-align:center; padding:8px 12px; font-weight:700; font-size:.85rem;">
+  🧪 AMBIENTE DE PRUEBAS — datos de ejemplo, no reales.
+</div>
+
+<header>
+  <div class="header-row">
+    <div>
+      <h1>🔒 Privacidad y términos de uso</h1>
+      <p class="subtitle">Cómo se manejan los datos en esta aplicación</p>
+    </div>
+    <div class="header-actions">
+      <a href="index.html" class="btn secondary">← Volver</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div class="card alert warning" style="font-weight:400;">
+    ⚠️ <b>Nota interna (quitar antes de producción):</b> este documento es una plantilla razonable para una app de agendamiento y facturación de un consultorio en Colombia (Ley 1581 de 2012 y Decreto 1377 de 2013), pero
+    <b>no reemplaza asesoría legal</b>. Antes de usarlo con pacientes reales: (1) un abogado debe revisarlo, y
+    (2) hay que completar los datos marcados como <span class="placeholder">[completar]</span> con la información real del consultorio.
+  </div>
+
+  <section class="card legal-nav">
+    <a href="#privacidad" class="btn secondary">Política de tratamiento de datos</a>
+    <a href="#terminos" class="btn secondary">Términos de uso</a>
+  </section>
+
+  <section class="card" id="privacidad">
+    <h2>Política de tratamiento de datos personales</h2>
+    <p class="fecha">Versión: 2026-09-07</p>
+
+    <h3>1. Responsable del tratamiento</h3>
+    <p>
+      <span class="placeholder">[Nombre completo o razón social — completar]</span>,
+      identificado con <span class="placeholder">[C.C./NIT — completar]</span>,
+      con domicilio en <span class="placeholder">[ciudad — completar]</span>,
+      correo de contacto <span class="placeholder">[correo — completar]</span>,
+      es responsable del tratamiento de los datos personales que se registran en esta aplicación
+      ("la App"), usada para la agenda y facturación del consultorio.
+    </p>
+
+    <h3>2. Datos que se tratan</h3>
+    <p>La App registra, según el módulo:</p>
+    <ul>
+      <li><b>Datos de acceso:</b> correo electrónico y contraseña de cada persona que usa la App (autenticación).</li>
+      <li><b>Datos de agenda:</b> fecha, hora, entidad/sede y, para agendamiento por paciente, el <b>nombre del paciente</b> asociado al turno.</li>
+      <li><b>Datos de facturación:</b> nombre, identificación, dirección, teléfono y datos bancarios del prestador del servicio; razón social, NIT, dirección y teléfono de las entidades que contratan el servicio (EPS, IPS, aseguradoras).</li>
+    </ul>
+    <p>
+      <b>La App no está diseñada para registrar historia clínica, diagnósticos, ni ningún dato de salud propiamente dicho</b> —
+      solo el hecho de que existió un turno/consulta agendada, para efectos de agenda y cobro. Aun así, el nombre de un
+      paciente vinculado a un consultorio médico puede considerarse un dato sensible bajo la ley colombiana; por eso se
+      trata con el mismo cuidado que el resto de esta política.
+    </p>
+
+    <h3>3. Finalidad del tratamiento</h3>
+    <ul>
+      <li>Agendar y llevar el control de turnos/citas del consultorio.</li>
+      <li>Generar cuentas de cobro y su historial, para el cobro a las entidades pagadoras.</li>
+      <li>Calcular deducciones de ley y preparar la información para la declaración de renta del prestador.</li>
+      <li>Dar acceso a la información únicamente a las personas vinculadas al mismo proyecto/consultorio (ej. la doctora y su secretaría).</li>
+    </ul>
+    <p>No se usan los datos para publicidad, ni se venden, alquilan o comparten con terceros distintos de los ya mencionados, salvo obligación legal.</p>
+
+    <h3>4. Cómo se protegen los datos</h3>
+    <ul>
+      <li>La información se guarda en una base de datos con <b>control de acceso por fila (Row Level Security)</b>: cada proyecto/consultorio solo puede ver y modificar sus propios datos, nunca los de otro proyecto.</li>
+      <li>Solo las personas explícitamente vinculadas a un proyecto (por invitación) pueden ver su información.</li>
+      <li>La conexión entre la App y la base de datos va cifrada (HTTPS/TLS).</li>
+      <li>Las contraseñas nunca se guardan en texto plano; las administra el proveedor de autenticación (Supabase Auth).</li>
+    </ul>
+
+    <h3>5. Derechos de las personas titulares de los datos (derechos ARCO)</h3>
+    <p>Toda persona cuyo dato se trate en la App (paciente, prestador, o persona con cuenta) tiene derecho a:</p>
+    <ul>
+      <li><b>Acceder</b> a sus datos personales.</li>
+      <li><b>Conocer, actualizar y rectificar</b> su información, especialmente si es parcial, inexacta o desactualizada.</li>
+      <li><b>Solicitar prueba</b> de la autorización otorgada.</li>
+      <li><b>Solicitar la supresión</b> de sus datos cuando no exista un deber legal o contractual de conservarlos.</li>
+      <li><b>Revocar la autorización</b> para el tratamiento, cuando no exista un deber legal o contractual de mantenerlo.</li>
+      <li><b>Presentar quejas</b> ante la Superintendencia de Industria y Comercio (SIC) por infracciones a la ley de protección de datos.</li>
+    </ul>
+    <p>Para ejercer estos derechos, escribe a <span class="placeholder">[correo de contacto — completar]</span> indicando tu solicitud; se responderá dentro de los términos que establece la ley (10 días hábiles para consultas, 15 días hábiles para reclamos, con posibilidad de una prórroga informada).</p>
+
+    <h3>6. Conservación de los datos</h3>
+    <p>
+      Los datos de agenda y facturación se conservan mientras la cuenta/proyecto esté activo y, después, por el
+      tiempo que exija la normativa tributaria y contable aplicable en Colombia. Una persona puede solicitar la
+      eliminación de su cuenta de acceso en cualquier momento; esto no elimina los registros de facturación que
+      el consultorio deba conservar por ley.
+    </p>
+
+    <h3>7. Cambios a esta política</h3>
+    <p>
+      Si esta política cambia de forma sustancial, se pedirá una nueva aceptación explícita la próxima vez que
+      cada persona inicie sesión, antes de poder seguir usando la App.
+    </p>
+  </section>
+
+  <section class="card" id="terminos">
+    <h2>Términos de uso</h2>
+    <p class="fecha">Versión: 2026-09-07</p>
+
+    <h3>1. Aceptación</h3>
+    <p>Al crear una cuenta o usar la App, aceptas estos términos y la Política de tratamiento de datos personales de la sección anterior.</p>
+
+    <h3>2. Uso de la cuenta</h3>
+    <ul>
+      <li>Cada persona es responsable de la confidencialidad de su contraseña y de la actividad realizada desde su cuenta.</li>
+      <li>El acceso a un proyecto (consultorio) se otorga por invitación de quien ya pertenece a él; no debe compartirse un código de invitación con personas ajenas al consultorio.</li>
+      <li>La información que se registra (turnos, entidades, cuentas de cobro) es responsabilidad de quien la ingresa: la App no verifica su exactitud.</li>
+    </ul>
+
+    <h3>3. Disponibilidad del servicio</h3>
+    <p>
+      La App se ofrece "tal cual" ("as is"), sin garantía de disponibilidad ininterrumpida. Puede haber
+      mantenimientos, fallas del proveedor de infraestructura, o interrupciones fuera de control razonable.
+      Se recomienda no depender de la App como único respaldo de información crítica sin verificar copias de
+      seguridad periódicas.
+    </p>
+
+    <h3>4. Limitación de responsabilidad</h3>
+    <p>
+      <span class="placeholder">[Responsable — completar]</span> no será responsable por perjuicios indirectos,
+      lucro cesante, o pérdida de datos derivados del uso de la App, salvo dolo o culpa grave, en la medida
+      permitida por la ley colombiana.
+    </p>
+
+    <h3>5. Propiedad de la información</h3>
+    <p>
+      Los datos que cada proyecto/consultorio registra le pertenecen a ese consultorio. Al terminar la relación
+      con la App, puede solicitarse una exportación de la información, en el formato disponible en ese momento.
+    </p>
+
+    <h3>6. Terminación</h3>
+    <p>
+      Cualquiera de las partes puede terminar el uso del servicio en cualquier momento. El acceso puede
+      suspenderse si el plan de suscripción vence y no se renueva (la información ya registrada permanece
+      disponible para consulta; no se elimina automáticamente por falta de pago).
+    </p>
+
+    <h3>7. Ley aplicable</h3>
+    <p>Estos términos se rigen por las leyes de la República de Colombia.</p>
+
+    <h3>8. Contacto</h3>
+    <p>Preguntas sobre estos términos: <span class="placeholder">[correo de contacto — completar]</span>.</p>
+  </section>
+
+</main>
+
+</body>
+</html>

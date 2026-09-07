@@ -29,6 +29,7 @@
     <button type="submit" id="btn-login" class="btn primary">Entrar</button>
     <p class="login-note">Cada proyecto (consultorio) es independiente — solo las personas vinculadas a él ven sus turnos, entidades y cuentas de cobro.</p>
     <p class="login-switch">¿No tienes cuenta? <a href="#" id="link-show-signup">Crea una</a></p>
+    <p class="login-switch"><a href="legal.html" target="_blank" rel="noopener">Política de privacidad y términos de uso</a></p>
   </form>
 
   <form id="signup-form" class="login-card" hidden>
@@ -47,6 +48,7 @@
     <button type="submit" id="btn-signup" class="btn primary">Crear cuenta</button>
     <p class="login-note">Después de crear tu cuenta eliges: crear un proyecto nuevo (tu propio consultorio, vacío) o vincularte a uno existente con un código de invitación.</p>
     <p class="login-switch">¿Ya tienes cuenta? <a href="#" id="link-show-login">Inicia sesión</a></p>
+    <p class="login-switch"><a href="legal.html" target="_blank" rel="noopener">Política de privacidad y términos de uso</a></p>
   </form>
 </div>
 
@@ -86,6 +88,22 @@
 
     <p class="login-switch"><a href="#" id="link-logout-proyecto">Cerrar sesión</a></p>
   </div>
+</div>
+
+<!-- ACEPTAR POLÍTICA DE DATOS / TÉRMINOS DE USO (obligatorio, una vez por versión vigente) -->
+<div id="consentimiento-screen" hidden>
+  <form id="form-consentimiento" class="login-card" style="width:min(460px,100%);">
+    <h1>🔒 Antes de continuar</h1>
+    <p class="subtitle">Manejamos datos de pacientes y de facturación — necesitamos tu aceptación explícita antes de usar la app.</p>
+    <div id="consentimiento-alert" class="alert" hidden></div>
+    <p class="hint" style="margin:0;">Puedes leer el detalle completo aquí: <a href="legal.html#privacidad" target="_blank" rel="noopener">Política de tratamiento de datos personales</a> y <a href="legal.html#terminos" target="_blank" rel="noopener">Términos de uso</a>.</p>
+    <label class="inline" style="align-items:flex-start; gap:8px;">
+      <input type="checkbox" id="consentimiento-check" required style="width:auto; margin-top:3px;">
+      <span style="font-size:.82rem; font-weight:400; color:var(--ink);">He leído y acepto la Política de tratamiento de datos personales y los Términos de uso.</span>
+    </label>
+    <button type="submit" id="btn-aceptar-consentimiento" class="btn primary">Aceptar y continuar</button>
+    <p class="login-switch"><a href="#" id="link-logout-consentimiento">Cerrar sesión</a></p>
+  </form>
 </div>
 
 <div id="app-root" hidden>

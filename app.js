@@ -16,6 +16,7 @@ function showLoginAlert(msg, type){
 function showLoginScreen(){
   document.getElementById("app-root").hidden = true;
   document.getElementById("proyecto-screen").hidden = true;
+  document.getElementById("consentimiento-screen").hidden = true;
   document.getElementById("login-screen").hidden = false;
   document.getElementById("login-password").value = "";
   showLoginForm(); // al volver a la pantalla de acceso (ej. tras salir), siempre arranca en login, no en registro
@@ -87,6 +88,14 @@ async function entrarAProyecto(proyecto){
 // tiene uno guardado o pertenece a exactamente uno) o pide elegir/crear/vincularse.
 async function handleAuthenticated(){
   document.getElementById("login-screen").hidden = true;
+  // Habeas Data: nadie sigue de largo (ni cuenta nueva, ni cuenta ya existente desde
+  // antes de que esto existiera) sin aceptar explícitamente la política vigente.
+  if (!(await tieneConsentimientoVigente())){
+    document.getElementById("proyecto-screen").hidden = true;
+    document.getElementById("app-root").hidden = true;
+    document.getElementById("consentimiento-screen").hidden = false;
+    return;
+  }
   const { activo, lista } = await resolverProyectoActivo();
   if (activo){
     document.getElementById("proyecto-screen").hidden = true;
@@ -95,6 +104,26 @@ async function handleAuthenticated(){
   }
   showProyectoScreen();
   renderProyectoLista(lista);
+}
+function showConsentimientoAlert(msg, type){
+  const box = document.getElementById("consentimiento-alert");
+  box.hidden = false;
+  box.className = "alert " + type;
+  box.textContent = (type === "error" ? "⚠️ " : "✅ ") + msg;
+}
+async function handleAceptarConsentimiento(e){
+  e.preventDefault();
+  const btn = document.getElementById("btn-aceptar-consentimiento");
+  btn.disabled = true;
+  try{
+    await registrarConsentimiento();
+    document.getElementById("consentimiento-screen").hidden = true;
+    await handleAuthenticated(); // ahora sí, con el consentimiento ya registrado
+  }catch(err){
+    showConsentimientoAlert("No se pudo registrar tu aceptación: " + err.message, "error");
+  }finally{
+    btn.disabled = false;
+  }
 }
 async function handleCrearProyecto(e){
   e.preventDefault();
@@ -1205,6 +1234,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
   sb.auth.onAuthStateChange((event, session)=>{
     if (session) handleAuthenticated(); else showLoginScreen();
   });
+
+  document.getElementById("form-consentimiento").addEventListener("submit", handleAceptarConsentimiento);
+  document.getElementById("link-logout-consentimiento").addEventListener("click", (e)=>{ e.preventDefault(); handleLogout(); });
 
   document.getElementById("form-crear-proyecto").addEventListener("submit", handleCrearProyecto);
   document.getElementById("form-vincular-proyecto").addEventListener("submit", handleVincularProyecto);

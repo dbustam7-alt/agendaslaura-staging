@@ -546,7 +546,14 @@ function showNeedsProject(){
   document.getElementById("needs-login").hidden = false;
   document.getElementById("cc-root").hidden = true;
 }
+function showNeedsConsent(){
+  document.getElementById("needs-login-text").textContent = "Antes de continuar, debes aceptar la política de tratamiento de datos en la app principal.";
+  document.getElementById("needs-login").hidden = false;
+  document.getElementById("cc-root").hidden = true;
+}
 async function enterPage(){
+  // Habeas Data: el formulario para aceptar la política solo vive en index.html.
+  if (!(await tieneConsentimientoVigente())){ showNeedsConsent(); return; }
   const { activo } = await resolverProyectoActivo();
   if (!activo){ showNeedsProject(); return; }
 
