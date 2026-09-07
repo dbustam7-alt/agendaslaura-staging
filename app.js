@@ -148,8 +148,8 @@ function renderAgenda(){
       <td>${t.inicio}</td>
       <td>${t.fin}</td>
       <td>${fmtHours(calc.horas)}</td>
-      <td>${esc(calc.detalle)}</td>
       <td>${calc.subtotal ? fmtMoney(calc.subtotal) : "—"}</td>
+      <td>${esc(calc.detalle)}</td>
     `;
     tbody.appendChild(tr);
   }
