@@ -499,18 +499,38 @@ function renderHistorial(){
     btn.addEventListener("click", ()=> handleDeleteCuenta(btn.dataset.del));
   });
 }
+// Marcar "pagada" pide la fecha con un modal propio (en vez de window.prompt,
+// que bloquea el hilo de JS y no combina con el resto de la interfaz) — ver
+// abrirDialogoFechaPago()/handleConfirmarFechaPago().
 async function handleToggleEstado(id){
   const c = CUENTAS.find(x=>x.id === id);
   if (!c) return;
-  try{
-    if (c.estado === "pagada"){
+  if (c.estado === "pagada"){
+    try{
       await updateEstadoCuentaDB(id, "pendiente", null);
-    } else {
-      const hoy = getLocalDateISO();
-      const fecha = prompt(`Fecha de pago de la cuenta de cobro N° ${String(c.numero).padStart(3,"0")}:`, hoy);
-      if (fecha === null) return; // canceló
-      await updateEstadoCuentaDB(id, "pagada", fecha || hoy);
+      CUENTAS = await fetchCuentasCobro();
+      renderHistorial();
+    }catch(e){
+      showAlert("Error actualizando el estado de pago: " + e.message, "error");
     }
+    return;
+  }
+  abrirDialogoFechaPago(c);
+}
+let cuentaPendienteMarcar = null;
+function abrirDialogoFechaPago(c){
+  cuentaPendienteMarcar = c;
+  document.getElementById("fecha-pago-texto").textContent = `Fecha de pago de la cuenta de cobro N° ${String(c.numero).padStart(3,"0")}:`;
+  document.getElementById("fecha-pago-input").value = getLocalDateISO();
+  document.getElementById("dlg-fecha-pago").showModal();
+}
+async function handleConfirmarFechaPago(){
+  const c = cuentaPendienteMarcar;
+  if (!c) return;
+  const fecha = document.getElementById("fecha-pago-input").value || getLocalDateISO();
+  document.getElementById("dlg-fecha-pago").close();
+  try{
+    await updateEstadoCuentaDB(c.id, "pagada", fecha);
     CUENTAS = await fetchCuentasCobro();
     renderHistorial();
   }catch(e){
@@ -606,4 +626,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
     document.getElementById("hist-hasta").value = "";
     renderHistorial();
   });
+
+  const dlgFechaPago = document.getElementById("dlg-fecha-pago");
+  document.getElementById("btn-close-fecha-pago").addEventListener("click", ()=> dlgFechaPago.close());
+  dlgFechaPago.addEventListener("click", (e)=>{ if (e.target === dlgFechaPago) dlgFechaPago.close(); });
+  document.getElementById("btn-confirmar-fecha-pago").addEventListener("click", handleConfirmarFechaPago);
 });

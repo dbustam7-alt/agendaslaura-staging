@@ -183,6 +183,20 @@
 
 </div>
 
+<dialog id="dlg-fecha-pago" class="app-dialog no-print">
+  <div class="dlg-header">
+    <h2>💰 Marcar como pagada</h2>
+    <button type="button" id="btn-close-fecha-pago" class="dlg-close" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dlg-body">
+    <p class="hint" id="fecha-pago-texto"></p>
+    <label>Fecha de pago
+      <input type="date" id="fecha-pago-input">
+    </label>
+    <button type="button" id="btn-confirmar-fecha-pago" class="btn primary" style="margin-top:10px;">Marcar pagada</button>
+  </div>
+</dialog>
+
 <script src="shared.js"></script>
 <script src="cuenta-cobro.js"></script>
 </body>
