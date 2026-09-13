@@ -703,7 +703,9 @@ function buildEntidadConfigFields(tipo, cfg){
         <label>Hora fin<input type="time" class="ent-hora-fin" value="${cfg.horaFin || "11:00"}"></label>
         <label>Buffer traslado (min)<input type="number" class="ent-buffer" value="${cfg.bufferMin ?? 30}" min="0" step="5"></label>
         <label>Vigente desde<input type="date" class="ent-vigencia" value="${cfg.vigenciaDesde || ""}"></label>
-      </div>`;
+      </div>
+      <label class="inline chip-check" style="margin-top:8px;"><input type="checkbox" class="ent-permite-cruce" ${cfg.permiteCruce ? "checked" : ""}> Permite que turnos de otras entidades se crucen con este bloque</label>
+      <p class="hint" style="margin:6px 0 0;">Desmarcado (por defecto): ningún turno de otra entidad puede agendarse dentro de este bloque ± el buffer de traslado. Marcado: este bloque deja de chocar con otras entidades (sigue chocando con turnos ya registrados de la propia entidad).</p>`;
   }
   if (tipo === "por_hora"){
     return `
@@ -726,6 +728,7 @@ function collectEntidadConfigFromRow(tr, tipo){
       horaFin: tr.querySelector(".ent-hora-fin").value,
       bufferMin: Number(tr.querySelector(".ent-buffer").value || 0),
       vigenciaDesde: tr.querySelector(".ent-vigencia").value || null,
+      permiteCruce: tr.querySelector(".ent-permite-cruce").checked,
     };
   }
   if (tipo === "por_hora"){

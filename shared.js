@@ -620,6 +620,9 @@ function validarTurno(nuevo, excludeId, extra){
         }
         continue; // es el propio bloque, válido
       }
+      // Si el bloque fijo tiene marcado "permite cruce", no bloquea turnos de otras
+      // entidades (ej. CES puede convivir con NOEL o AUNA a la misma hora).
+      if (b.entidad.config.permiteCruce) continue;
       const cfg = b.entidad.config;
       return {
         ok:false,
