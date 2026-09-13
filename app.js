@@ -558,7 +558,11 @@ function addAgendaFormRow(){
     inpValor.value = opt ? opt.dataset.tarifa : 0;
   }
   aplicarValorPorDefecto(); // trae el valor por defecto del remitente ya seleccionado
-  selRem.addEventListener("change", aplicarValorPorDefecto); // al cambiar de remitente, sugiere su valor (se puede volver a editar)
+  // Si la persona toca el valor a mano (o viene restaurado al editar un turno ya
+  // guardado — ver startEditTurno), un cambio de remitente después ya NO debe
+  // pisarlo: solo se autocompleta mientras el campo siga "virgen".
+  inpValor.addEventListener("input", ()=> { row.dataset.valorManual = "1"; });
+  selRem.addEventListener("change", ()=> { if (!row.dataset.valorManual) aplicarValorPorDefecto(); });
   row.querySelector(".eps-row-remove").addEventListener("click", ()=> row.remove());
   wrap.appendChild(row);
   return row;
@@ -663,6 +667,7 @@ function startEditTurno(id){
       if (d){
         row.querySelector(".f-agenda-remitente").value = d.remitenteId;
         row.querySelector(".f-agenda-valor").value = d.tarifa;
+        row.dataset.valorManual = "1"; // es un valor ya guardado (posiblemente ajustado a mano) — protegido igual que uno recién tecleado
         if (d.nombrePaciente){
           row.querySelector(".f-agenda-nombre-paciente").value = d.nombrePaciente;
         } else {
